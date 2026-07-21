@@ -1,0 +1,66 @@
+
+    Para zephyr:
+    https://docs.zephyrproject.org/latest/develop/getting_started/index.html#getting-started
+
+    Instalar cubeprogrammer
+    (NO SUDO) https://www.st.com/content/st_com/en/stm32cubeprogrammer.html?dl=redirect#st-get-software
+
+    Para zephyr SDK
+    # 1. Download the 1.0.1 minimal tarball
+    wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v1.0.1/zephyr-sdk-1.0.1_linux-x86_64_minimal.tar.xz
+
+    # 2. Extract it into your tools folder (or where you want it)
+    tar xvf zephyr-sdk-1.0.1_linux-x86_64_minimal.tar.xz
+
+    # 3. Enter the new SDK folder
+    cd zephyr-sdk-1.0.1
+
+    # Install ONLY the arm toolchain (-t) and host tools (-c)
+    > sudo apt-get install cmake
+    ./setup.sh -t arm-zephyr-eabi -c
+
+    Crear una carpeta y dentro un venv para west:
+    # 1. Create and enter your fresh workspace directory
+    mkdir zephyr-stm32-workspace
+    cd zephyr-stm32-workspace
+
+    # 2. Create a virtual environment named '.venv' inside this folder
+    python3 -m venv .venv
+
+    # 3. Activate the virtual environment
+    source .venv/bin/activate
+
+    # 1. Install west inside the virtual environment
+    pip install west
+
+    # 2. Initialize the workspace (using "." tells West to use the current folder)
+    west init -m https://github.com/zephyrproject-rtos/zephyr .
+
+    # 3. Apply the filter to block all other heavy vendor HALs
+    west config manifest.project-filter -- "-hal_.*,+hal_stm32,+hal_nordic" (quizá con esto valga, pero si no quitar con
+    west config manifest.project-filter -- "" (y ejecutar para que traiga todo, al parecer los ejemplos tienen dependencias aleatorias)
+
+    # 4. Download only the required Zephyr + STM32 files
+    west update
+
+    > pip3 install -r scripts/requirements.txt
+
+    # Copy the blinky sample recursively to a new folder
+    cp -r zephyr/samples/basic/blinky my_blinky
+    > cd my_blinky
+    > west build -b stm32f412g_disco
+    (otra terminal) > python3 -m serial.tools.miniterm /dev/ttyACM0 115200
+    > west flash
+
+
+
+
+    
+    > git clone https://github.com/zephyrproject-rtos/zephyr.git
+    > sudo apt-get install ninja-build
+    > sudo apt install python3-pip python3-venv
+    > source venv/bin/activate
+	> pip3 install -r scripts/requirements.txt
+	west init -l .
+	west update
+	west build -b stm32f412g_disco samples/hello_world

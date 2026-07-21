@@ -1,0 +1,87 @@
+\section{Práctica 0: Configuración del entorno de programación}
+
+    Las prácticas de la asignatura de PSyD se desarrollan en un entorno ya preparado dentro de una máquina virtual. Esto es debido a la comodidad y portabilidad que ofrece, ya que con trasladar un simple fichero, cualquiera puede tener todas las herramientas disponibles en su ordenador. No obstante, también se ofrece aquí una guía de instalación para quien quiera instalarlo todo de manera nativa en su ordenador. La guía se ha realizado para Ubuntu. Su adaptación a otros sistemas operativos (MacOS, o Windows con WSL) es relativamente directa, al estar las herramientas disponibles para todas las plataformas. 
+
+    \subsection{Paso 1: Configuración para máquina virtual}
+        Sigue esta parte sólo si quieres utilizar la máquina virtual proporcionada con todo el kit de herramientas, o si quieres crear una propia desde cero. Si quieres hacerlo de manera nativa, salta a \Cref{sub:toolkitsetup}.
+
+        \begin{itemize}
+            \item Asegúrate de tener instalado \textbf{VirtualBox} en su versión más reciente. Puedes descargarlo desde \url{https://www.virtualbox.org/wiki/Downloads}.
+            \item Importante también descargar, desde el mismo enlace, el ``VirtualBox Extension Pack''. Sin él, perderemos funcionalidades de la MV, entre otros, la capacidad de conectarle USBs (como el depurador ST-Link de la placa).
+        \end{itemize}
+
+    \subsection{Paso 2: Creación de la Máquina Virtual}
+        Crea una nueva máquina virtual e instala \textbf{Ubuntu} (recomendado versión \textbf{24.04 LTS}, descargable desde \url{https://ubuntu.com/download}). Configura el hardware asignándole los siguientes recursos recomendados:
+        \begin{itemize}
+            \item \textbf{Memoria RAM:} 8192 MB
+            \item \textbf{Procesadores:} 4 núcleos (Cores).
+            \item \textbf{Memoria de Vídeo:} 128 MB.
+            \item \textbf{Tamaño del disco:} 60GB.
+            \item \textbf{Tipo de instalación:} Manual. No utilizar la automática ya que instala cosas de más.
+        \end{itemize}
+        Una vez seleccionados los recursos, lanza la máquina y el instalador comenzará automáticamente. Deberás seleccionar cuestiones como el nombre de la máquina, usuario, contraseña... elige el que más te guste. El resto de la configuración se puede dejar por defecto. Ten en cuenta que el proceso de instalación puede tardar una una media hora (dependiendo del sistema anfitrión).
+
+        Una vez arranque la máquina, es importante instalar los extras de invitado (``Guest additions''), para conseguir que anfitrión y host se comunique adecuadamente (y puedan por ejemplo compartir portapapeles, ajustar el tamaño de pantalla, etc). Para ello haz click en \texttt{devices > insert guest additions CD image}. Esto cargará un disco en la MV (panel izquierdo). Sitúa la terminal en el directorio del CD (botón derecho sobre el explorador de archivos y click en ``abrir terminal aquí''). Deberás ejecutar una serie de comandos:
+
+        \begin{lstlisting}
+        # Actualizar paquetes existentes
+        > sudo apt update && sudo apt upgrade
+        # Instalar herramientas para compilar las guest additions
+        > sudo apt install bzip2 build-essential dkms linux-headers-$(uname -r)
+        # Instalar guest additions
+        > sudo ./VBoxLinuxAdditions.run
+        \end{lstlisting}
+
+
+    \subsection{Paso 3: Configuración del ToolKit de STM}\label{sub:toolkitsetup}
+        Independientemente de si quieres utilizar tu propio sistema operativo para instalar las herramientas, o instalarlas en la máquina virtual, se hace de la misma manera. A continuación se muestran todas las herramientas, repositorios, etc necesarios para tener todo lo necesario en la asignatura. Si prefieres no realizar la instalación, puedes descargar la máquina virtual directamente configurada desde \pendiente{ENLACE}.
+
+        \begin{itemize}
+            \item Instalar STM32CubeIDE (la herramienta principal de desarrollo) desde aquí: \url{https://www.st.com/en/development-tools/stm32cubeide.html}
+            \item Instalar STM32CubeMX (para configuración avanzada) desde aquí: \url{https://www.st.com/en/development-tools/stm32cubemx.html}
+            \item Instalar STM32CubeProgrammer (para compatibilidad con zephyr) desde aquí: \url{https://www.st.com/en/development-tools/stm32cubeprog.html}
+            \item Instalar picocom para comunicar con la placa con posterioridad:
+                \begin{lstlisting}
+                    > sudo apt-get install picocom
+                \end{lstlisting}
+        \end{itemize}
+
+    \subsection{Paso 4: Configuración de las herramientas de Zephyr}
+        Para poder utilizar las herramientas de Zephyr, y compilar el sistema operativo en tiempo real para las placas, hay que hacer una serie de configuraciones relativamente complejas, que incluyen la descarga de varios repositorios. Aquí están las instrucciones oficiales, que replicamos en este documento: \url{https://docs.zephyrproject.org/latest/develop/getting_started/index.html#getting-started}.
+
+        \begin{lstlisting}
+            # Instala las dependencias necesarias para trabajar con zephyr:
+            > sudo apt install --no-install-recommends git cmake ninja-build \ 
+                gperf ccache dfu-util device-tree-compiler wget python3-dev \ 
+                python3-venv python3-tk xz-utils file make gcc gcc-multilib \ 
+                g++-multilib libsdl2-dev libmagic1
+            # Crea una carpeta para el paquete de zephyr:
+            > mkdir ~/zephyrproject
+            # Crea un entorno virtual de python
+            > python3 -m venv ~/zephyrproject/.venv
+            # Cambia al entorno virtual para activar los paquetes de python necesarios
+            > source ~/zephyrproject/.venv/bin/activate
+            # Instala West (gestor de dependencias) e inicializa el proyecto
+            > pip install west
+            > west init -m https://github.com/zephyrproject-rtos/zephyr ~/zephyrproject
+            > cd ~/zephyrproject
+            > west update
+            # Exporta zephyr para que sea encontrado por otras herramientas
+            > west zephyr-export
+            # Instala las dependencias:
+            > west packages pip --install
+            # Instala el SDK de zephyr:
+            > cd ~/zephyrproject/zephyr
+            > west sdk install #(Usar primero --help para poner solo la toolchain de st)
+        \end{lstlisting}
+
+        Ya estamos listos para probar zephyr con un ejemplo y ver que funciona:
+        
+        \begin{lstlisting}
+            # Copy the blinky sample to a new folder
+            > cp -r zephyr/samples/basic/blinky my_blinky
+            > cd my_blinky
+            > west build -b stm32f412g_disco
+            (otra terminal) > picocom /dev/ttyACM0 -b 115200 -d 7 -p o
+            > west flash
+        \end{lstlisting}

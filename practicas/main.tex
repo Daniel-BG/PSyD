@@ -1,0 +1,125 @@
+\documentclass[svgnames,spanish,11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{babel}
+\usepackage{geometry}
+\usepackage[most]{tcolorbox}
+\usepackage{hyperref}
+\usepackage{cleveref} 
+\usepackage{xcolor}
+\usepackage{xurl}
+\usepackage{listings}
+\usepackage{lstautogobble}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning}
+
+
+
+% Definimos el comando \pendientes con texto rojo y fondo negro
+\newcommand{\pendiente}[1]{\colorbox{black}{\textcolor{red}{\textbf{#1}}}}
+
+
+%%%% HIGHLIGHTS %%%%%
+% Define colors
+\definecolor{lightyellow}{HTML}{FFFFF4} % Ultra-faint, subtle warm yellow background
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codeblue}{rgb}{0.1,0.1,0.7}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{codegreen}{rgb}{0.0,0.5,0.0} % Dark green for clean legibility
+
+\lstset{
+    language=C,
+    autogobble=true,
+    backgroundcolor=\color{lightyellow}, % Very faint background
+    basicstyle=\ttfamily\small,
+    numbers=left,
+    numberstyle=\tiny\color{codegray},
+    stepnumber=1,
+    numbersep=10pt,
+    keywordstyle=\color{codeblue}\bfseries,
+    commentstyle=\color{codegreen}, % Green comments
+    stringstyle=\color{codepurple},
+    breaklines=true,
+    showstringspaces=false,
+    tabsize=4,
+    frame=single,
+    rulecolor=\color{gray!25},
+    framesep=4pt,
+    % --- Spanish character support (utf-8 / pdflatex) ---
+    inputencoding=utf8,
+    extendedchars=true,
+    literate=
+      {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+      {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+      {ñ}{{\~n}}1 {Ñ}{{\~N}}1 {¿}{{{\textquestiondown}}}1 {¡}{{{\textexcldown}}}1
+}
+
+%%%%%%Comandos para referencias y demás del procesador
+
+% --- Paleta de Colores Unificada ---
+\definecolor{refbg}{HTML}{E8F2FF}     % Azul claro (Manuales de referencia)
+\definecolor{reftext}{HTML}{0055B8}
+
+\definecolor{brdbg}{HTML}{EBF9F5}     % Verde menta suave (Manuales de placa)
+\definecolor{brdtext}{HTML}{007A5E}
+
+\definecolor{regbg}{HTML}{FFF4E5}     % Naranja suave (Registros)
+\definecolor{regtext}{HTML}{B85B00}
+
+\definecolor{membg}{HTML}{F3F4F6}     % Gris técnico (Direcciones de memoria)
+\definecolor{memtext}{HTML}{1F2937}
+
+% --- Comando Base para "Burbujas/Badges" ---
+\newcommand{\codebubble}[3]{%
+  \tcbox[
+    on line,
+    arc=4pt,
+    outer arc=4pt,
+    colback=#1,
+    colframe=#1,
+    coltext=#2,
+    boxsep=0pt, left=5pt, right=5pt, top=2pt, bottom=2pt,
+    boxrule=0pt
+  ]{\small\texttt{#3}}%
+}
+
+% --- Definición de Comandos de Tu Práctica ---
+
+% Manual de Referencia (Soporta argumento opcional limpio)
+\newcommand{\REFMAN}[1][]{%
+  \codebubble{refbg}{reftext}{rm0431\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
+}
+
+% Manual de la Placa
+\newcommand{\BRDMAN}[1][]{%
+  \codebubble{brdbg}{brdtext}{um2140\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
+}
+
+% Registros (Resaltado naranja técnico)
+\newcommand{\REG}[1]{\codebubble{regbg}{regtext}{\textbf{#1}}}
+
+% Direcciones de Memoria (Gris código neutro)
+\newcommand{\MEMORY}[1]{\codebubble{membg}{memtext}{#1}}
+
+% Hardware (Limpio y legible)
+\newcommand{\MCU}{\textsf{\textbf{STM32F723IE}}}
+\newcommand{\BOARD}{\textsf{\textbf{32F723EDISCOVERY}}}
+
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+
+\title{Prácticas de PSyD}
+\author{Daniel Báscones García}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+\newpage
+% Aquí se irán incluyendo los temas individuales
+\include{practica0/practica0.tex}
+\include{practica1/practica1.tex}
+\include{practica2/practica2.tex}
+
+\end{document}
