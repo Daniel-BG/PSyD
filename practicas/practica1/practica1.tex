@@ -1,3 +1,8 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+
 \section{Práctica 1: Periféricos mapeados en memoria (MMIO): Entrada/Salida de propósito general (GPIO)}
 
     \subsection{Objetivos}
@@ -75,14 +80,14 @@
 
         \begin{figure}
             \centering
-            \includegraphics[width=\textwidth]{practica1/res/stm32f723mm.png}
+            \includegraphics[width=\textwidth]{res/stm32f723mm.png}
             \caption{Mapa de memoria del \MCU}
             \label{fig:stm32f723mm}
         \end{figure}
 
         \begin{figure}
             \centering
-            \includegraphics[width=\textwidth]{practica1/res/stm32f723mm_detail.png}
+            \includegraphics[width=\textwidth]{res/stm32f723mm_detail.png}
             \caption{Detalle del mapa de memoria del \MCU}
             \label{fig:stm32f723mm_detail}
         \end{figure}
@@ -93,7 +98,7 @@
 
         \begin{figure}
             \centering
-            \includegraphics[width=\textwidth]{practica1/res/stm32f723_gpio_moder_reg.png}
+            \includegraphics[width=\textwidth]{res/stm32f723_gpio_moder_reg.png}
             \caption{Detalle del registro MODER}
             \label{fig:stm32f723mm_moder}
         \end{figure}
@@ -102,7 +107,7 @@
 
         \begin{figure}
             \centering
-            \includegraphics[width=\textwidth]{practica1/res/stm32f723_discovery_pins.png}
+            \includegraphics[width=\textwidth]{res/stm32f723_discovery_pins.png}
             \caption{Pines para LEDS y botones de la placa \BOARD}
             \label{fig:stm32f723disco_pins}
         \end{figure}
@@ -120,7 +125,7 @@
 
                     \begin{figure}
                         \centering
-                        \includegraphics[width=\textwidth]{practica1/res/scrn_01_startup.png}
+                        \includegraphics[width=\textwidth]{res/scrn_01_startup.png}
                         \caption{Ventana inicial de la aplicación}
                         \label{fig:scrn_01_startup}
                     \end{figure}
@@ -129,7 +134,7 @@
                     
                     \begin{figure}
                         \centering
-                        \includegraphics[width=\textwidth]{practica1/res/scrn_02_project.png}
+                        \includegraphics[width=\textwidth]{res/scrn_02_project.png}
                         \caption{Creación de proyecto}
                         \label{fig:scrn_02_project}
                     \end{figure}
@@ -138,7 +143,7 @@
                                     
                     \begin{figure}
                         \centering
-                        \includegraphics[width=\textwidth]{practica1/res/scrn_03_boardsel.png}
+                        \includegraphics[width=\textwidth]{res/scrn_03_boardsel.png}
                         \caption{Selección de placa}
                         \label{fig:scrn_03_boardsel}
                     \end{figure}
@@ -147,7 +152,7 @@
                     
                     \begin{figure}
                         \centering
-                        \includegraphics[width=\textwidth]{practica1/res/scrn_04_namesel.png}
+                        \includegraphics[width=\textwidth]{res/scrn_04_namesel.png}
                         \caption{Selección de nombre de proyecto}
                         \label{fig:scrn_04_namesel}
                     \end{figure}
@@ -159,7 +164,7 @@
 
                 \begin{figure}
                     \centering
-                    \includegraphics[width=\textwidth]{practica1/res/scrn_06_structure.png}
+                    \includegraphics[width=\textwidth]{res/scrn_06_structure.png}
                     \caption{Aplicación por defecto}
                     \label{fig:scrn_06_structure}
                 \end{figure}
@@ -170,7 +175,7 @@
                 
                     \begin{figure}
                         \centering
-                        \includegraphics[width=\textwidth]{practica1/res/scrn_07_build.png}
+                        \includegraphics[width=\textwidth]{res/scrn_07_build.png}
                         \caption{Log tras construir la aplicación}
                         \label{fig:scrn_07_build}
                     \end{figure}
@@ -180,7 +185,7 @@
                 
                     \begin{figure}
                         \centering
-                        \includegraphics[width=\textwidth]{practica1/res/scrn_08_debugsel.png}
+                        \includegraphics[width=\textwidth]{res/scrn_08_debugsel.png}
                         \caption{Selección de depuración por defecto}
                         \label{fig:scrn_08_debugsel}
                     \end{figure}
@@ -199,7 +204,7 @@
 
                 \begin{figure}
                     \centering
-                    \includegraphics[width=\textwidth]{practica1/res/scrn_11_debugpersonalized.png}
+                    \includegraphics[width=\textwidth]{res/scrn_11_debugpersonalized.png}
                     \caption{Ventana de depuración personalizada}
                     \label{fig:scrn_11_debugpersonalized}
                 \end{figure}
@@ -243,4 +248,7 @@
 
         \subsubsection{Solución}
 
-            \lstinputlisting{practica1/src/main.c}
+            \lstinputlisting{src/main.c}
+
+
+\end{document}

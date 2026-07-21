@@ -13,6 +13,8 @@
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning}
 
+\usepackage{subfiles} % Required for subfile compilation
+
 
 
 % Definimos el comando \pendientes con texto rojo y fondo negro
@@ -107,18 +109,23 @@
 
 
 \geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\setlength{\parskip}{1em}
 
 \title{Prácticas de PSyD}
 \author{Daniel Báscones García}
 \date{\today}
 
 \begin{document}
+\setlength{\parskip}{0em}
 \maketitle
 \tableofcontents
+\setlength{\parskip}{1em}
 
 \newpage
 % Aquí se irán incluyendo los temas individuales
-\include{practica0/practica0.tex}
-\include{practica1/practica1.tex}
+\subfile{practica0/practica0.tex}
+\newpage
+\subfile{practica1/practica1.tex}
+\newpage
 
 \end{document}
