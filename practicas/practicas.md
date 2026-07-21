@@ -14,6 +14,8 @@ En cualquiera de los dos casos, las instrucciones, herramientas y paquetes neces
 
 ## [Práctica 1](practica1/practica1.pdf) - Acceso elemental a dispositivos mapeados en memoria - Registros y depuración
 
+En esta práctica se presenta la estructura de control del procesador, mediante accesos mapeados en memoria. También se introducen las nociones básicas de creación y depuración de proyectos.
+
 ### Objetivos:
   
 * Crear un proyecto de ejemplo desde cero para la placa.
@@ -29,22 +31,30 @@ Busca el GPIO del botón de la placa, configúralo en modo entrada, y haz que el
 
 ---
 
-## Práctica 2 - Creación de BSP
+## [Práctica 2](practica2/practica2.pdf) - Creación de BSP
 
-    Objetivos:
-        * Crear un BSP para facilitar las tareas al programador.
-        * Entender la organización y estructura de un BSP básico
+En esta práctica se introduce la idea de BSP, y se propone la creación de uno minimalista.
 
-    Para hacer más -> Abre el proyecto BSP de ejemplo e investiga cómo están organizadas las funciones y demás, ahí se encuentra el paquete completo.
+### Objetivos:
+* Desarrollar un *Board Support Package* minimalista.
+* Entender la importancia de crear, en la medida de lo posible, código no dependiente del hardware.
+ 
+### Para hacer más
 
-## Práctica 3 - Entrada / Salida programada - UART TX
+Abre el proyecto BSP de ejemplo (dentro del paquete **STM32CubeF7**) e investiga cómo están organizadas las funciones, definiciones, registros... Para navegar por el proyecto, puedes ir haciendo \texttt{ctrl+click} en las llamadas a funciones o variables, y te llevará al fichero donde están definidas.
 
-    Objetivos:
-        * Comprender el concepto de "periférico" dentro de un procesador
-        * Aprender a programar un periférico 
-        * Interactuar con el periférico desde fuera de la placa
+## [Práctica 3](practica3/practica3.pdf) - Entrada / Salida programada - UART TX
 
-    Para hacer más -> Averigua cómo hacer transferencias en modo DMA para poder seguir ejecutando código mientras la UART hace su trabajo "sola".
+La UART es uno de los periféricos más extendidos para intercomunicación de dispositivos empotrados por su sencillez de implementación. No es lo más rápido, pero sí uno de los protocolos más interoperativos. En esta práctica se programa una UART para comunicación directa con el ordenador.
+
+### Objetivos:
+* Comprender más en profundidad el concepto de "periférico" dentro de un procesador.
+* Aprender a programar un periférico.
+* Interactuar con el periférico desde fuera de la placa.
+
+### Para hacer más
+
+Averigua cómo hacer transferencias en modo DMA para poder seguir ejecutando código mientras la UART hace su trabajo "sola".
 
 ## Práctica 4 Entrada / Salida por interrupciones - UART RX
 

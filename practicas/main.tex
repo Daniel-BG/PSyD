@@ -11,7 +11,7 @@
 \usepackage{lstautogobble}
 \usepackage{graphicx}
 \usepackage{tikz}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, arrows, calc, shapes, babel}
 
 \usepackage{subfiles} % Required for subfile compilation
 
@@ -33,7 +33,7 @@
     language=C,
     autogobble=true,
     backgroundcolor=\color{lightyellow}, % Very faint background
-    basicstyle=\ttfamily\small,
+    basicstyle=\ttfamily\footnotesize,
     numbers=left,
     numberstyle=\tiny\color{codegray},
     stepnumber=1,
@@ -65,6 +65,9 @@
 \definecolor{brdbg}{HTML}{EBF9F5}     % Verde menta suave (Manuales de placa)
 \definecolor{brdtext}{HTML}{007A5E}
 
+\definecolor{dsbg}{HTML}{FBE9F5}     % Morado suave (Datasheet del procesador)
+\definecolor{dstext}{HTML}{7A005E}
+
 \definecolor{regbg}{HTML}{FFF4E5}     % Naranja suave (Registros)
 \definecolor{regtext}{HTML}{B85B00}
 
@@ -85,27 +88,40 @@
   ]{\small\texttt{#3}}%
 }
 
-% --- Definición de Comandos de Tu Práctica ---
-
-% Manual de Referencia (Soporta argumento opcional limpio)
+% --- Comandos genéricos por si se cambia algo ---
 \newcommand{\REFMAN}[1][]{%
   \codebubble{refbg}{reftext}{rm0431\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
 }
-
-% Manual de la Placa
 \newcommand{\BRDMAN}[1][]{%
   \codebubble{brdbg}{brdtext}{um2140\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
 }
-
-% Registros (Resaltado naranja técnico)
+\newcommand{\DSMAN}[1][]{%
+  \codebubble{dsbg}{dstext}{ds11853\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
+}
 \newcommand{\REG}[1]{\codebubble{regbg}{regtext}{\textbf{#1}}}
-
-% Direcciones de Memoria (Gris código neutro)
 \newcommand{\MEMORY}[1]{\codebubble{membg}{memtext}{#1}}
-
-% Hardware (Limpio y legible)
 \newcommand{\MCU}{\textsf{\textbf{STM32F723IE}}}
 \newcommand{\BOARD}{\textsf{\textbf{32F723EDISCOVERY}}}
+
+% Define a custom light blue color
+\definecolor{lightbluebg}{HTML}{EBF3FA}
+\definecolor{darkblueborder}{HTML}{2B6CB0}
+
+% Define the custom \question{...} command
+\newcommand{\question}[1]{%
+  \begin{tcolorbox}[
+    colback=lightbluebg,       % Light blue background
+    colframe=darkblueborder,   % Darker blue border
+    arc=3mm,                   % Rounded corner radius
+    boxrule=1pt,               % Border thickness
+    left=12pt, right=12pt,     % Inside padding (left/right)
+    top=10pt, bottom=10pt,     % Inside padding (top/bottom)
+    enhanced,
+    breakable                  % Allows the box to split across pages safely
+  ]
+    \textbf{Pregunta:} #1
+  \end{tcolorbox}%
+}
 
 
 \geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
@@ -126,6 +142,10 @@
 \subfile{practica0/practica0.tex}
 \newpage
 \subfile{practica1/practica1.tex}
+\newpage
+\subfile{practica2/practica2.tex}
+\newpage
+\subfile{practica3/practica3.tex}
 \newpage
 
 \end{document}

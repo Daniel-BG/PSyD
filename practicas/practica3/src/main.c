@@ -1,0 +1,55 @@
+
+
+#include <stdint.h>
+#include <bsp.h>
+
+#define CLOCK_RATE 16000000
+#define BAUD_RATE 115200
+#define UART_BRR_SAMPLING16 ((CLOCK_RATE + BAUD_RATE/2) / BAUD_RATE)
+
+
+#include <stdint.h>
+
+
+int main(void)
+{
+	/* Enable GPIOE and set port 0 to 0 to light up LED0 */
+	RCC_AHB1ENR->bits.GPIOAEN = 1;
+	GPIO_MODE_SET(GPIOA, 7, GPIO_MODE_OUTPUT);
+	GPIO_OTYPE_SET(GPIOA, 7, GPIO_OTYPE_PP);
+	GPIO_OSPEED_SET(GPIOA, 7, GPIO_OSPEED_HIGH);
+	GPIO_PUPD_SET(GPIOA, 7, GPIO_PUPD_NONE);
+	GPIO_PIN_WRITE(GPIOA, 7, GPIO_STATE_ZERO);
+
+	/* Enable GPIOA for UART TX pin (Table 10 of DS11853)*/
+	RCC_AHB1ENR->bits.GPIOCEN = 1;
+	GPIO_MODE_SET(GPIOC, 6, GPIO_MODE_ALT);
+	GPIO_OTYPE_SET(GPIOC, 6, GPIO_OTYPE_PP);
+	GPIO_PUPD_SET(GPIOC, 6, GPIO_PUPD_PU);
+	GPIO_OSPEED_SET(GPIOC, 6, GPIO_OSPEED_HIGH);
+	GPIO_AF_SET(GPIOC, 6, GPIO_AF8_USART6);
+
+	//Configure UART (30.3.2)
+	RCC_APB2ENR->bits.USART6EN = 1; 		//enable UART clock
+	UART_ENABLE_SET(USART6, UART_ENABLE);	//enable UART peripheral
+	UART_WORDLENGTH_SET(USART6, UART_WORD_8B);	//set word length (8 bit)
+	UART_STOPBIT_SET(USART6, UART_STOP_ONEBIT);	//set stop bits (1 bit)
+	UART_PARITY_SET(USART6, UART_PARITY_NONE);	//set parity (enabled - odd)
+	UART_OVERSAMPLING_SET(USART6, UART_OVERSAMPLING_16);	//set oversampling to 16
+	USART6->BRR = UART_BRR_SAMPLING16;						//set BRR (Baud rate register) to CLK/BAUD
+	UART_TX_MODE_SET(USART6, UART_TX_ENABLE);	//enable transmission
+
+
+	/* Loop forever */
+	for(;;) {
+		//SEND DATA
+		UART_TransmitByte(USART6, 'X');
+		UART_TransmitByte(USART6, 'Y');
+		UART_TransmitByte(USART6, 'Z');
+		GPIO_PIN_WRITE(GPIOA, 7, GPIO_STATE_ONE);
+		delay(1000000);
+		GPIO_PIN_WRITE(GPIOA, 7, GPIO_STATE_ZERO);
+		delay(1000000);
+	}
+}
+
