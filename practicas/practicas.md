@@ -16,55 +16,25 @@ En cualquiera de los dos casos, las instrucciones, herramientas y paquetes neces
 
 En esta práctica se presenta la estructura de control del procesador, mediante accesos mapeados en memoria. También se introducen las nociones básicas de creación y depuración de proyectos.
 
-### Objetivos:
-  
-* Crear un proyecto de ejemplo desde cero para la placa.
-* Familiarizarse con el entorno STMCubeIDE para desarrollo y depuración.
-* Entender la vista de depuración y las partes internas del procesador que son visibles:
-    - Registros, memoria, registros especiales, depuración, desensamblado, ...
-* Entender el concepto de dispositivo mapeado en memoria.
-* Crear un pequeño programa que encienda un LED.
-
-### Para hacer más
-
-Busca el GPIO del botón de la placa, configúralo en modo entrada, y haz que el LED se encienda o apague cada vez que se pulse el botón, en lugar de hacerlo de manera automática.
-
 ---
 
 ## [Práctica 2](practica2/practica2.pdf) - Creación de BSP
 
-En esta práctica se introduce la idea de BSP, y se propone la creación de uno minimalista.
+En esta práctica se introduce la idea de BSP, un paquete que permite trabajar de manera cómoda con los elementos del procesador y placa. Se realizará la creación de un BSP personalizado para el proyecto.
 
-### Objetivos:
-* Desarrollar un *Board Support Package* minimalista.
-* Entender la importancia de crear, en la medida de lo posible, código no dependiente del hardware.
- 
-### Para hacer más
-
-Abre el proyecto BSP de ejemplo (dentro del paquete **STM32CubeF7**) e investiga cómo están organizadas las funciones, definiciones, registros... Para navegar por el proyecto, puedes ir haciendo \texttt{ctrl+click} en las llamadas a funciones o variables, y te llevará al fichero donde están definidas.
+---
 
 ## [Práctica 3](practica3/practica3.pdf) - Entrada / Salida programada - UART TX
 
 La UART es uno de los periféricos más extendidos para intercomunicación de dispositivos empotrados por su sencillez de implementación. No es lo más rápido, pero sí uno de los protocolos más interoperativos. En esta práctica se programa una UART para comunicación directa con el ordenador.
 
-### Objetivos:
-* Comprender más en profundidad el concepto de "periférico" dentro de un procesador.
-* Aprender a programar un periférico.
-* Interactuar con el periférico desde fuera de la placa.
+---
 
-### Para hacer más
+## [Práctica 4](practica4/practica4.pdf) - Entrada / Salida por interrupciones - UART RX y botones
 
-Averigua cómo hacer transferencias en modo DMA para poder seguir ejecutando código mientras la UART hace su trabajo "sola".
+Las interrupciones permiten que el procesador ejecute cierta funcionalidad únicamente cuando ocurran eventos preprogramados. Su gestión requiere de una configuración concreta que se explora en esta práctica, mediante interrupciones para la recepción de información por UART y la detección de pulsaciones de botones.
 
-## Práctica 4 Entrada / Salida por interrupciones - UART RX
-
-    Objetivos:
-        * Aprender a trabajar con las interrupciones de los periféricos
-        * Comprender las diferentes líneas de interrupción y cómo multiplexarlas.
-        
-
-    Para hacer más ->
-
+---
 
 ## Práctica 5 - Entrada / Salida mediante interrupciones - Control de rebotes y timers y cuenta de tiempo real
 

@@ -11,7 +11,7 @@
 \usepackage{lstautogobble}
 \usepackage{graphicx}
 \usepackage{tikz}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, arrows, calc, shapes, babel}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, matrix, arrows, calc, shapes, babel, fit, backgrounds}
 
 \usepackage{subfiles} % Required for subfile compilation
 
@@ -68,8 +68,14 @@
 \definecolor{dsbg}{HTML}{FBE9F5}     % Morado suave (Datasheet del procesador)
 \definecolor{dstext}{HTML}{7A005E}
 
+\definecolor{pmbg}{HTML}{FBE9E5}     % Rojo suave (Datasheet del procesador)
+\definecolor{pmtext}{HTML}{7A0000}
+
 \definecolor{regbg}{HTML}{FFF4E5}     % Naranja suave (Registros)
 \definecolor{regtext}{HTML}{B85B00}
+
+\definecolor{perbg}{HTML}{F4F4E5}     % Amarillo suave (Registros)
+\definecolor{pertext}{HTML}{7A7A00}
 
 \definecolor{membg}{HTML}{F3F4F6}     % Gris técnico (Direcciones de memoria)
 \definecolor{memtext}{HTML}{1F2937}
@@ -98,7 +104,11 @@
 \newcommand{\DSMAN}[1][]{%
   \codebubble{dsbg}{dstext}{ds11853\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
 }
+\newcommand{\PMMAN}[1][]{%
+  \codebubble{pmbg}{pmtext}{pm0253\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
+}
 \newcommand{\REG}[1]{\codebubble{regbg}{regtext}{\textbf{#1}}}
+\newcommand{\PER}[1]{\codebubble{perbg}{pertext}{\textbf{#1}}}
 \newcommand{\MEMORY}[1]{\codebubble{membg}{memtext}{#1}}
 \newcommand{\MCU}{\textsf{\textbf{STM32F723IE}}}
 \newcommand{\BOARD}{\textsf{\textbf{32F723EDISCOVERY}}}
@@ -146,6 +156,8 @@
 \subfile{practica2/practica2.tex}
 \newpage
 \subfile{practica3/practica3.tex}
+\newpage
+\subfile{practica4/practica4.tex}
 \newpage
 
 \end{document}

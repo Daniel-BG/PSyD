@@ -1,0 +1,348 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+
+\section{Práctica 4:}
+
+    \subsection{Objetivos}
+        \begin{itemize}
+            \item Aprender qué son las interrupciones, cómo funcionan, y sus características.
+            \item Programar el controlador de interrupciones para la recepción de datos con UART.
+            \item Programar el controlador de interrupciones para entrada con botón.
+        \end{itemize}
+
+    \subsection{Fundamentos teóricos}
+        
+        \subsubsection{Configuración de las interrupciones en el procesador}
+
+            Para responder de manera rápida y consistente a eventos en un microcontrolador, es buena idea utilizar una \emph{interrupción hardware} para ejecutar un pequeño fragmento de código al detectar dichos eventos. En esta práctica, vamos a ver cómo funciona el controlador de interrupciones en STM32, que puede configurarse para ejecutar ciertas funciones al ocurrir determinados eventos.
+
+            Cada procesador tiene su propia manera de tratar interrupciones. En la familia STM32, y en concreto de \MCU, se utilizan dos periféricos diferentes para su gestión:
+
+            \begin{itemize}
+                \item \PER{NVIC}: El (\emph{Nested Vectored Interrupt Controller}) \PMMAN[4.2] es el gestor de interrupciones interno del procesador Cortex-M7, núcleo dentro del \MCU. Permite la programación de hasta 240 interrupciones, con control de prioridad en cada una de ellas. En el caso de nuestro procesador, \MCU, están disponibles unas 100 (\REFMAN[9.1.2]), aunque utilizaremos nada más que un par de ellas.
+                \item \PER{EXTI}: (\emph{EXtended Interrupt Controller}). Su propósito es extender el número de interrupciones disponibles a los programadores a través de eventos externos al propio procesador. Cada periférico interno tiene sus propias líneas de interrupción en el \PER{NVIC}, como puede verse en \REFMAN[9.1.2], sin embargo, para los eventos en pines de E/S (a través de GPIO), la configuración de la interrupción se hace desde el \PER{EXTI}.
+                
+                En la familia STM32, los pines GPIO están agrupados (PA0, PB0, PC0...). El periférico \PER{EXTI} no tiene una línea directa para cada pin individual de la placa, sino que usa líneas compartidas (la línea \texttt{EXTI0} gestiona PA0, PB0, PC0, etc. a través de un multiplexor en el \PER{SYSCFG}). Por tanto, no se pueden usar, por ejemplo, PA0 y PB0 como interrupciones independientes simultáneamente.
+            \end{itemize}
+
+            Adicionalmente, los periféricos externos, aunque estén conectados a las líneas de interrupción, deben ser configurados para generar las señales de interrupción necesarias.
+
+            En resumen, estos procesadores tienen interrupciones internas a través del \PER{NVIC}, que hay que activar, además de realizar la configuración de los periféricos y, algunos casos como el GPIO, configurar \PER{EXTI} para recibir sus interrupciones. En esta práctica, configuraremos las interrupciones de \PER{UART} directamente desde \PER{NVIC}, y las de \texttt{GPIO} utilizando también \PER{EXTI}. Podemos ver un diagrama de las interconexiones entre todo en la \Cref{fig:stm32_interrupt_flow}.
+
+            \begin{figure}[htbp]
+            \centering
+            \begin{tikzpicture}[
+                % Increased horizontal distance to give arrow text plenty of breathing room
+                node distance=1.4cm and 2.2cm,
+                font=\small\sffamily,
+                hw/.style={rectangle, draw=blue!70!black, fill=blue!10, thick, rounded corners, align=center, minimum height=1.1cm, minimum width=2.2cm},
+                exti/.style={rectangle, draw=orange!80!black, fill=orange!15, thick, rounded corners, align=center, minimum height=1.1cm, minimum width=2.2cm},
+                nvic/.style={rectangle, draw=red!70!black, fill=red!15, thick, rounded corners, align=center, minimum height=2.8cm, minimum width=2.5cm},
+                core/.style={rectangle, draw=green!60!black, fill=green!15, thick, rounded corners, align=center, minimum height=2.8cm, minimum width=2.5cm},
+                isr/.style={rectangle, draw=purple!70!black, fill=purple!10, thick, dashed, align=center, minimum height=1.1cm},
+                line/.style={draw, -Stealth, thick},
+                % Placed text above arrows without background fill so line stays drawn beneath
+                labelstyle/.style={font=\tiny\sffamily, align=center, inner sep=2pt}
+            ]
+
+                % Nodos de origen
+                \node [hw] (gpio) {Pin GPIO\\ \scriptsize(Ej. Botón User)};
+                \node [hw, below=1.4cm of gpio] (uart) {Periférico\\ Interno\\ \scriptsize(Ej. USART6)};
+
+                % Bloque EXTI + SYSCFG
+                \node [exti, right=of gpio] (exti) {Módulo \textbf{EXTI}\\ \scriptsize(+ SYSCFG Mux)\\ \tiny Detección de flanco};
+
+                % Bloque NVIC
+                \node [nvic, right=1.8cm of exti, yshift=-0.9cm] (nvic) {\textbf{NVIC}\\ \scriptsize(Cortex-M7)\\ \tiny Control de Prioridades\\ y Vectores};
+
+                % Núcleo procesador
+                \node [core, right=2.0cm of nvic] (cpu) {Núcleo \textbf{CPU}\\ \scriptsize Cortex-M7\\ \tiny Interrumpe hilo principal};
+
+                % Rutina de servicio
+                \node [isr, below=1.2cm of cpu] (isr) {\textbf{Rutina ISR}\\ \scriptsize Ej: \texttt{EXTI0\_IRQHandler()}};
+
+                % Conexiones / Flechas con etiquetas posicioanadas 'above' o 'side'
+                \path [line] (gpio) -- node[labelstyle, above] {Entrada digital} (exti);
+                \path [line] (exti.east) -- node[labelstyle, above, sloped] {Línea EXTIx} (nvic.west);
+                
+                % Conexión directa UART a NVIC
+                \path [line] (uart.east) -- node[labelstyle, above, sloped,pos=0.45] {Línea IRQ directa} (nvic.west);
+
+                % Conexión NVIC a CPU
+                \path [line] (nvic) -- node[labelstyle, above] {{Excepción \texttt{IRQn}}} (cpu);
+
+                % Conexión CPU a ISR
+                \path [line] (cpu) -- node[labelstyle, right] {Ejecuta} (isr);
+
+                % Agrupaciones visuales con Backgrounds
+                \begin{scope}[on background layer]
+                    \node [draw=black!30, fill=black!5, fit=(gpio) (uart), label=above:{\scriptsize Hardware Ext. / Periféricos}] {};
+                    \node [draw=red!30, fill=red!5, fit=(nvic) (cpu), label=above:{\scriptsize Núcleo ARM Cortex-M7}] {};
+                \end{scope}
+
+            \end{tikzpicture}
+            \caption{Flujo de interrupciones en el microcontrolador STM32F723E.}
+            \label{fig:stm32_interrupt_flow}
+            \end{figure}
+
+        \subsubsection{Gestión de interrupciones mediante funciones}
+
+            Cuando se produce una interrupción, el procesador debe pausar su ejecución y saltar a la dirección de memoria donde se encuentra la rutina de respuesta o ISR (Interrupt Service Routine). Como la ubicación física de estas funciones en la memoria Flash no es fija (depende de la compilación), el procesador utiliza una Tabla de Vectores de Interrupción (Vector Table).
+
+            Esta tabla es un array de punteros ubicado al inicio de la memoria (por defecto desde \MEMORY{0x00000000}), donde cada posición está reservada para un evento concreto:
+
+            \begin{itemize}
+                \item La posición \MEMORY{0x00000000} almacena el valor inicial del puntero de pila (MSP).
+                \item La dirección \MEMORY{0x00000004} contiene el vector de Reset.
+                \item Direcciones posteriores contienen los vectores o punteros a las rutinas de interrupción, como por ejemplo \MEMORY{0x0000015C} que contiene el puntero a la rutina de la \PER{USART6} (\REFMAN[9.1.2]).
+            \end{itemize}
+            
+            Para evitarnos la tarea de configurar esta tabla manualmente, el código de inicio del procesador (\texttt{Startup/startup\_stm32f723iekx.s}) la genera automáticamente durante el arranque. Por defecto, todas las entradas de la tabla apuntan a un bucle infinito genérico (\lstinline|Default_Handler|) mediante el atributo \lstinline|.weak|. Si definimos en nuestro código C una función con el nombre exacto de la interrupción (por ejemplo, \lstinline|USART6_IRQHandler|), el enlazador (linker) la sobrescribirá automáticamente, redirigiendo la tabla hacia nuestra rutina. Podemos ver este proceso en \Cref{fig:vector_table_linking}.
+
+            \begin{figure}[htbp]
+            \centering
+            \begin{tikzpicture}[
+                font=\small\sffamily,
+                line/.style={draw, -Stealth, thick},
+                weakline/.style={draw, -Stealth, thick, dashed, gray},
+                % Estilos para las tablas de memoria (Corregido: minimum width en lugar de width)
+                matrixstyle/.style={
+                    matrix of nodes,
+                    nodes={draw, minimum height=0.6cm, anchor=center, align=center, font=\footnotesize\ttfamily},
+                    column 1/.style={nodes={fill=gray!15, minimum width=2.4cm}},
+                    column 2/.style={nodes={minimum width=3.8cm}},
+                    row 1/.style={nodes={fill=blue!20, font=\bfseries\sffamily\footnotesize}}
+                }
+            ]
+
+                % --- TABLA 1: VECTOR TABLE ---
+                \matrix (vectable) [matrixstyle] {
+                    Offset / Dir. & Contenido (Vector) \\
+                    0x00000000 & Stack Pointer \\
+                    0x00000004 & Reset\_Handler \\
+                    \dots & \dots \\
+                    0x00000058 & EXTI0\_IRQHandler \\
+                    \dots & \dots \\
+                    0x0000015C & USART6\_IRQHandler \\
+                    \dots & \dots \\
+                };
+
+                % Título Tabla Vectores
+                \node[above=0.2cm of vectable-1-1.north west, anchor=south west, font=\bfseries\sffamily] 
+                    {1. Tabla de Vectores (Flash / RAM)};
+
+                % --- TABLA 2: MEMORIA DE CÓDIGO (C / STARTUP) ---
+                \matrix (codemem) [matrixstyle, right=2.2cm of vectable.north east, anchor=north west] {
+                    Dirección & Código / Función \\
+                    0x08000100 & Reset\_Handler() \\
+                    0x08000250 & Default\_Handler() \\
+                    \dots & \dots \\
+                    0x08001F10 & USART6\_IRQHandler() \\
+                    0x08002F4C & EXTI0\_IRQHandler() \\
+                };
+
+                % Título Tabla Código
+                \node[above=0.2cm of codemem-1-1.north west, anchor=south west, font=\bfseries\sffamily] 
+                    {2. Funciones en Flash (\texttt{.text})};
+
+                % --- FLECHAS DE ENLAZADO Y PUNTEROS ---
+                
+                % Reset -> Reset_Handler
+                \path [line, color=black] 
+                    (vectable-3-2.east) -- node[above, font=\tiny\sffamily, sloped] {Puntero} (codemem-2-1.west);
+
+                % USART6 -> ISR de Usuario (Sobrescribe .weak)
+                \path [line, color=blue!80!black, ultra thick] 
+                    (vectable-7-2.east) -- node[above, font=\tiny\sffamily, sloped] {Redirigido por C} (codemem-5-1.west);
+                \path [line, color=blue!80!black, ultra thick] 
+                    (vectable-5-2.east) -- (codemem-6-1.west);
+
+                % EXTI0 -> Default_Handler (.weak no redefinido)
+                \path [weakline] 
+                    (vectable-4-2.east) -- node[below, font=\tiny\sffamily, sloped] {Por defecto (.weak)} (codemem-3-1.west);
+                \path [weakline] 
+                    (vectable-6-2.east) -- (codemem-3-1.west);
+                \path [weakline] 
+                    (vectable-8-2.east) -- (codemem-3-1.west);
+
+                % --- NOTAS EXPLICATIVAS (Corregido text width) ---
+                \node [draw=orange!80!black, fill=orange!10, rounded corners, inner sep=6pt, below=0.8cm of vectable, align=left, font=\tiny\sffamily, text width=5.2cm] (note1) {
+                    \textbf{Atributo \texttt{.weak} en Startup:}\\
+                    Si el usuario \textbf{NO} define la función en C, la tabla apunta al \texttt{Default\_Handler} (bucle infinito).
+                };
+
+                \node [draw=green!60!black, fill=green!10, rounded corners, inner sep=6pt, below=0.8cm of codemem, align=left, font=\tiny\sffamily, text width=5.2cm] (note2) {
+                    \textbf{Redefinición en C:}\\
+                    Al escribir \texttt{void USART6\_IRQHandler(void)} en C, el linker asigna la dirección real de tu función en la tabla.
+                };
+
+            \end{tikzpicture}
+            \caption{Mapeo de la Tabla de Vectores de Interrupción a la memoria del programa.}
+            \label{fig:vector_table_linking}
+            \end{figure}
+
+
+    \subsection{Desarrollo de la práctica}
+
+        Como en prácticas anteriores, el objetivo es seguir extendiendo nuestro BSP con las funciones necesarias como para controlar los periféricos y funcionalidades que utilizaremos en esta práctica. En este caso, debemos hacer varias cosas:
+
+        \begin{enumerate}
+            \item Apúntate las direcciones base de los periféricos \PER{NVIC} en \PMMAN[4.2], y \PER{EXTI} y \PER{SYSCFG} en \REFMAN[1.6.2], crea además las estructuras de datos con las que accederás a los registros. Básate, respectivamente, en \PMMAN[4.2] para \PER{NVIC} (Ten en cuenta que los reigstros no están consecutivos), en \REFMAN[10.7.7] para \PER{EXTI}, y en \REFMAN[7.2.8] para \PER{SYSCFG}. Crea además las variables para manejarlos. Puedes basarte en el siguiente código:
+            
+
+                \begin{lstlisting}
+                    #define EXTI_BASE_ADDR 		0x40013C00UL
+                    //... completar para NVIC y SYSCFG
+
+                    typedef struct
+                    {
+                        volatile uint32_t ISER[8U];               /*!< Offset: 0x000 (R/W)  Interrupt Set Enable Register */
+                        uint32_t RESERVED0[24U];
+                        //... completar
+                    }  NVIC_TypeDef;
+
+                    typedef struct
+                    {
+                        volatile uint32_t MEMRMP;       /*!< SYSCFG memory remap register,                      Address offset: 0x00      */
+                        //... completar
+                    } SYSCFG_TypeDef;
+
+                    typedef struct
+                    {
+                        volatile uint32_t IMR;    /*!< EXTI Interrupt mask register,            Address offset: 0x00 */
+                        //... completar
+                    } EXTI_TypeDef;
+
+                    #define EXTI                ((EXTI_TypeDef *) EXTI_BASE_ADDR)
+                    //... completar para NVIC y SYSCFG
+                \end{lstlisting}
+
+            \item Debemos activar el puerto y pin correspondiente al botón. Revisando la documentación, en \BRDMAN[Table 5] nos dice que el botón está enchufado a la función wake-up del procesador, y en \BRDMAN[Table 19] que dicha función \texttt{SYS\_WKUP1} está en el PA0. Por tanto, lo primero es configurar este pin como entrada, de tipo \emph{push-pull} con el \emph{pulldown} activado, y a velocidad alta. No te olvides de activar también el reloj de GPIOA a través de \REG{AHB1ENR}.
+            \item A continuación, hay que activar también el pin de transmisión de la UART. En \BRDMAN[Table 19] podemos observar que la función \texttt{USART6\_RX} está conectada al pin PC7. Tenemos que configurarlo en modo \emph{alternativo} con la función 8 según nos indica \DSMAN[Table 12]. Adicionalmente, configurarlo en modo \emph{push-pull} con resistencia de \emph{pullup} y velocidad alta.
+            \item Finalmente, configuramos la \PER{UART} para que también funcione en modo recepción y tenga activas las interrupciones de recepción. Ambas cosas se pueden hacer desde el registro \REG{CR1} (\REFMAN[27.8.1]). Crea funciones en el BSP y define las constantes necesarias. Puedes hacer algo de este estilo:
+            
+                \begin{lstlisting}
+                    //en main.c
+                    UART_RX_MODE_SET(USART6, UART_RX_ENABLE);
+	                UART_RX_INT_SET(USART6, UART_RX_INT_ENABLE);    
+
+
+                    //en bsp.h
+                    // RECEIVE enable
+                    typedef enum {
+                        UART_RX_DISABLE = 0x00,
+                        UART_RX_ENABLE  = 0x01
+                    } UART_RX_Mode_t;
+                    #define UART_RX_MODE_MASK  0b1
+                    #define UART_RX_MODE_SHIFT 2
+
+                    static inline void UART_RX_MODE_SET(volatile USART_TypeDef *USARTx, UART_RX_Mode_t mode) {
+                        //... completar tocar el bit adecuado de CR1
+                    }
+
+                    //... completar hacer una función similar para RX INT enable
+                \end{lstlisting}
+            	
+            \item Ahora ya podemos comenzar a activar las interrupciones. Lo primero es activar el reloj para la configuración del sistema en \REG{APB2ENR} (\REFMAN[5.3.14]), para lo cual previamente deberemos definir los campos del registro.
+            
+                \begin{lstlisting}
+                    //en bsp.h
+                    #define RCC_APB2EN_BASE_ADDR 0x40023844 //APB2 clock control register
+                    
+                    //Structure for Reset Control peripheral register APB1
+                    typedef union {
+                        volatile uint32_t reg;
+
+                        // 2. Access individual bits or bit-groups for the register above
+                        struct {
+                            volatile uint32_t TIM1EN	   	: 1;  // Bit 0:
+                            volatile uint32_t TIM8EN	   	: 1;  // Bit 1:
+                            volatile uint32_t RES1		   	: 2;  // Bit 2-3:
+                            //... completar
+                        } bits;
+                    } RCC_APB2R_TypeDef;
+
+                    #define RCC_APB2ENR			((RCC_APB2R_TypeDef *) RCC_APB2EN_BASE_ADDR)
+                \end{lstlisting}
+
+            
+            A continuación, debemos configurar la interrupción externa \texttt{EINT0} (que multiplexa todos los pines 0) para que trabaje con el puerto A (recordemos que el botón está en PA0). Esto se hace desde el registro \REG{EXTICR} de \PER{SYSCFG} (\REFMAN[7.2.3]). Finalmente, hay que activar la interrupción externa 0 desde \PER{EXTI} a través del registro \REG{IMR} (\REFMAN[10.9.1]) en modo \emph{rising trigger} en el registro \REG{RTSR} (\REFMAN[10.9.3]).
+            
+
+                \begin{lstlisting}
+                    //... completar en bsp.h crear y rellenar estas funciones
+                    static inline void SYSCFG_EINT_MAP_PORT(uint32_t eintno, uint32_t portno) {
+                        //... completar modificar SYSCFG->EXTICR
+                    }
+
+                    static inline void EXTI_ENABLE_RISING_TRIGGER(uint32_t eintno, uint32_t enable) {
+                        //... completar activar/desactivar EXTI->RTSR
+                    }
+
+                    static inline void EXTI_UNMASK_INTERRUPT(uint32_t eintno, uint32_t unmask) {
+                        //... completar activar/desactivar EXTI->IMR
+                    }
+
+
+                    //en main.c
+                    RCC_APB2ENR->bits.SYSCFGEN = 1;
+                    //Activar EINT0 PUERTO A
+                    SYSCFG_EINT_MAP_PORT(0, 0); //port a (0) to eint0
+                    EXTI_ENABLE_RISING_TRIGGER(0, 1); 	//enable on port a
+                    EXTI_UNMASK_INTERRUPT(0, 1);		//unmask on port a
+                \end{lstlisting}
+            \item Ya tendríamos con esto el pin PA0 generando una interrupción en \texttt{EXTI0}, pero el procesador aún no responde a estas interrupciones. Adicionalmente, necesitamos activar la interrupción de la \PER{UART}. Ambas cosas se hacen desde el \PER{NVIC} en el registro \REG{ISER} (\PMMAN[4.2.2]). Para saber qué bits activar, debemos consular la numeración de las líneas de interrupción en \REFMAN[9].
+            
+                \begin{lstlisting}
+                    //en bsp.h
+                    //... completar buscar los números de línea
+                    #define EXTI0_LINE_IRQn
+                    #define USART6_INT_IRQn
+
+                    static inline void NVIC_ENABLE_INT(uint32_t line) {
+                        //... completar modificar el registro NVIC->ISER
+                    }
+
+                    //en main.h
+                    NVIC_ENABLE_INT(EXTI0_LINE_IRQn);
+	                NVIC_ENABLE_INT(USART6_INT_IRQn);
+                \end{lstlisting}
+
+            \item Por último, necesitamos crear dos funciones que respondan a sendas interrupciones. En este caso, la función \lstinline|USART6_IRQHandler| que responda a la \PER{USART6}, y \lstinline|EXTI0_IRQHandler| que responda al botón.
+            \item En el caso de la primera, \lstinline|USART6_IRQHandler|, deberemos comprobar primero que la interrupción ha sido generada por recepción, consultando el bit \texttt{RXNE} del registro \REG{ISR} de la \PER{UART} (\REFMAN[27.8.8]). Si es así, podremos leer el registro \REG{RDR} (\REFMAN[27.8.10]) para consultar el dato recibido, lo cual a su vez limpiará la interrupción. Dentro de la interrupción, para darle funcionalidad, podemos por ejemplo enviar de vuelta el dato leído al ordenador.
+            
+                \begin{lstlisting}
+                    void USART6_IRQHandler(void)
+                    {
+                        //... completar comprobar si el flag de interrupción está activo
+                        if () {
+                            //... completar leer el byte                            
+                        } 
+                    }
+                \end{lstlisting}
+            \item En el caso de la segunda \lstinline|EXTI0_IRQHandler|, el proceso es diferente. Primero, debemos comprobar que la interrupción está pendiente desde el registro \REG{PR} de \PER{EXTI} (\REFMAN[10.9.6]). A continuación, habrá que borrar dicho bit, escribiendo de nuevo en el registro, como indica la documentación. En esta función, por ejemplo, se puede poner como funcionalidad el dar la vuelta al LED que ya teníamos configurado anteriormente, para comprobar que funciona.
+            
+                \begin{lstlisting}
+                    void EXTI0_IRQHandler(void)
+                    {
+                        //... comprobar en EXTI->PR si la línea 0 generó interrupción
+                        if () {
+                            //... limpiar línea 0 escribiendo la posición 0 de EXTI->PR
+                            //... completar funcionalidad
+                        }
+                    }    
+                \end{lstlisting}
+                
+        \end{enumerate}
+
+
+    \subsection{Para hacer más}
+
+        Intenta cambiar ``en caliente'' la función que gestiona una interrupción, por ejemplo la del botón, modificando el puntero de las direcciones de memoria a las que salta el \PER{NVIC}.
+
+
+
+
+\end{document}
