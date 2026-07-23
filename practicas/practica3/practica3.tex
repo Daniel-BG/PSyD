@@ -3,7 +3,7 @@
 \begin{document}
 
 
-\section{Práctica 3:}
+\practica{Entrada / Salida programada - UART TX}
 
     \subsection{Objetivos}
         \begin{itemize}
@@ -101,12 +101,103 @@
         Para el desarrollo de esta práctica hay que extender el BSP introduciendo las funciones y definiciones necesarias de la UART, y posteriormente controlarla para emitir datos hacia el ordenador. La documentación necesaria puede verse en \REFMAN[27]. Los pasos a seguir son los siguientes:
 
         \begin{enumerate}
-            \item Según \DSMAN[Table 10], el pin PC6 es quien saca al exterior la UART. Configúralo en modo de función alternativa en \REG{MODER}, tipo push-pull en \REG{OTYPER}, pull-up en \REG{PUPDR}, velocidad alta en \REG{OSPEEDR}, y configura la función alternativa en \REG{AFR} para que sea la 8 (como indica \DSMAN[Table 12]). No te olvides de activar el puerto C a través de \REG{AHB1ENR}
+            \item Según \DSMAN[Table 10], el pin PC6 es quien saca al exterior la UART. Configúralo en modo de función alternativa en \REG{MODER}, tipo push-pull en \REG{OTYPER}, pull-up en \REG{PUPDR}, velocidad alta en \REG{OSPEEDR}, y configura la función alternativa en \REG{AFR} para que sea la 8 (como indica \DSMAN[Table 12]). No te olvides de activar el puerto C a través de \REG{AHB1ENR}.
+            
+                \begin{lstlisting}
+                    RCC_AHB1ENR->bits.GPIOCEN = 1;
+                    GPIO_MODE_SET(GPIOC, 6, GPIO_MODE_ALT);
+                    //... completar
+                \end{lstlisting}
+
             \item Ahora le toca el turno a la UART6 como nos indica \BRDMAN[5.13]. Actívala desde \REG{APB2ENR} lo primero.
+            
+                \begin{lstlisting}
+                    //en bsp.h
+                    #define RCC_APB2EN_BASE_ADDR 0x40023844
+                    //Structure for Reset Control peripheral register APB1
+                    typedef union {
+                        volatile uint32_t reg;
+
+                        // 2. Access individual bits or bit-groups for the register above
+                        struct {
+                            volatile uint32_t TIM1EN	   	: 1;  // Bit 0:
+                            volatile uint32_t TIM8EN	   	: 1;  // Bit 1:
+                            volatile uint32_t RES1		   	: 2;  // Bit 2-3:
+                            //... completar
+                        } bits;
+                    } RCC_APB2R_TypeDef;
+                    #define RCC_APB2ENR			((RCC_APB2R_TypeDef *) RCC_APB2EN_BASE_ADDR)
+
+                    
+                    //en main.c
+                    RCC_APB2ENR->bits.USART6EN = 1; 		//enable UART clock
+                \end{lstlisting}
+
             \item Configura la UART desde los registros \REG{CR1} y \REG{CR2} Activa el periférico, configura la longitud de palabra a 8 bits, 1 bit de stop y sin paridad, pone por último el oversampling a 16.
             \item Configura la velocidad de la UART desde \REG{BRR}. Tendrás que ponerle el valor del reloj del sistema (16MHz) entre la velocidad de la uart (115200).
             \item Por último, activa el modo de transmisión desde \REG{CR1}.
+            
+                \begin{lstlisting}
+                    // UART STOP BITS
+                    typedef enum {
+                        UART_STOP_ONEBIT = 0x00,
+                        UART_STOP_HALFBIT = 0x01,
+                        UART_STOP_TWOBIT   = 0x02,
+                        UART_STOP_ONEHALFBIT = 0x03
+                    } UART_Stop_t;
+                    #define UART_STOP_MASK 0b11
+                    #define UART_STOP_SHIFT 12
+
+                    static inline void UART_STOPBIT_SET(volatile USART_TypeDef *USARTx, UART_Stop_t stopbits) {
+                        //... completar configurar el registro CR2 con los bits de stop
+                    }
+
+                    // UART ENABLE
+                    typedef enum {
+                        UART_DISABLE = 0x00,
+                        UART_ENABLE = 0x01
+                    } UART_Enable_t;
+                    #define UART_ENABLE_MASK 0b1
+                    #define UART_ENABLE_SHIFT 0
+
+                    static inline void UART_ENABLE_SET(volatile USART_TypeDef *USARTx, UART_Enable_t enable) {
+                        //... completar configurar el registro CR1 con el bit de enable
+                    }
+
+                    // UART WORD LENGTH
+                    typedef enum {
+                        UART_WORD_8B = 0x00,
+                        UART_WORD_9B = 0x01,
+                        UART_WORD_7B = 0x02
+                    } UART_WordLength_t;
+                    #define UART_WORD_MASK  0b1
+                    #define UART_WORD_SHIFT 12
+
+                    static inline void UART_WORDLENGTH_SET(volatile USART_TypeDef *USARTx, UART_WordLength_t length) {
+                        //... completar escribir longitud en registro CR1
+                    }
+
+                    //... completar todas estas otras funciones auxiliares
+                    static inline void UART_PARITY_SET(volatile USART_TypeDef *USARTx, UART_Parity_t parity);
+                    static inline void UART_OVERSAMPLING_SET(volatile USART_TypeDef *USARTx, UART_Oversampling_t over);
+                    static inline void UART_TX_MODE_SET(volatile USART_TypeDef *USARTx, UART_TX_Mode_t mode);
+                \end{lstlisting}
             \item Cuando quieras transmitir un byte, espera primero a que quede libre el transmisor (aparece un 1 en el bit TC del registro \REG{ISR}. A continuación escribe el dato en el registro \REG{TDR}, la UART lo tramsmitirá solo.
+            
+                \begin{lstlisting}
+                    //... en bsp.h
+                    static inline void UART_TransmitByte(volatile USART_TypeDef *USARTx, uint8_t data)
+                    {
+                        while (!(USARTx->ISR & (1U << 7U))); //Wait until we can push data (TXE bit enabled)
+                        USARTx->TDR = data; //push data (this clears TXE bit)
+                    }
+
+
+                    //... en main.c
+                    UART_TransmitByte(USART6, 'X');
+                    UART_TransmitByte(USART6, 'Y');
+                    //...
+                \end{lstlisting}
         \end{enumerate}
      
         Para ver ahora los mensajes desde el ordenador, utilizaremos la utilidad \texttt{picocom} (o cualquier otra terminal de vuestro gusto). Desde la máquina virtual, abrir una terminal y ejecutar el comando:

@@ -3,7 +3,7 @@
 \begin{document}
 
 
-\section{Práctica 2: Creación de un \textit{Board Support Package} (BSP)}
+\practica{Creación de un \textit{Board Support Package} (BSP)}
 
     \subsection{Objetivos}
         \begin{itemize}
@@ -164,9 +164,64 @@
 
         \begin{enumerate}
             \item Completar la definición de tipo para incluir todos los registros. También completar la definición de tipo de \REG{AHB1ENR}.
-            \item Crear las funciones, junto con sus definiciones de valores, para controlar los diferentes registros.
-            \item Empaquetar toda esta funcionalidad en un fichero \texttt{bsp.h} que irá dentro de la carpeta \texttt{Inc} del proyecto.
+            
+                \begin{lstlisting}
+                    //... completar direcciones
+                    #define GPIO_BASE_ADDR 
+                    #define GPIOA_BASE_ADDR (GPIO_BASE_ADDR + 0x0000)
+                    #define RCC_AHB1EN_BASE_ADDR 
+
+                    //Structure for GPIO controllers
+                    typedef struct
+                    {
+                        volatile uint32_t MODER;    /*!< GPIO port mode register,               Address offset: 0x00      */
+                        volatile uint32_t OTYPER;   /*!< GPIO port output type register,        Address offset: 0x04      */
+                        //... completar
+                    } GPIO_TypeDef;
+
+                    //Structure for Reset and Clock Control peripheral clock register 1
+                    typedef union {
+                        volatile uint32_t reg;
+
+                        // 2. Access individual bits or bit-groups for the register above
+                        struct {
+                            volatile uint32_t GPIOAEN   	: 1;  // Bit 0: Enable peripheral (1 bit)
+                            volatile uint32_t GPIOBEN   	: 1;  // Bit 1: Enable peripheral (1 bit)
+                            //... completar
+                        } bits;
+                    } RCC_AHB_ENR_TypeDef;
+
+                    #define GPIOA               ((GPIO_TypeDef *) GPIOA_BASE_ADDR)
+                    #define RCC_AHB1ENR 		((RCC_AHB_ENR_TypeDef *) RCC_AHB1EN_BASE_ADDR)
+                \end{lstlisting}
+            \item Crear las funciones, junto con sus definiciones de valores, para controlar los diferentes registros. Toma el ejemplo previo de la función \lstinline|GPIO_MODE_SET| para hacer las demás.
+            
+                \begin{lstlisting}
+                    static inline void GPIO_MODE_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_Mode_t mode);
+                    static inline void GPIO_OTYPE_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_OType_t otype);
+                    static inline void GPIO_OSPEED_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_OSpeed_t ospeed);
+                    static inline void GPIO_PUPD_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_PuPd_t pupd);
+                    static inline void GPIO_PIN_WRITE(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_State_t state);
+                \end{lstlisting}
+            \item Recuerda empaquetar toda esta funcionalidad en un fichero \texttt{bsp.h} que irá dentro de la carpeta \texttt{Inc} del proyecto.
             \item Adaptar el código original \texttt{main.c} de la práctica para utilizar el BSP.
+                
+                \begin{lstlisting}
+                    int main(void)
+                    {
+                        RCC_AHB1ENR->bits.GPIOAEN = 1;
+
+                        GPIO_MODE_SET(GPIOA, 7, GPIO_MODE_OUTPUT);
+                        //... completar
+
+                        for(;;) {
+                            GPIO_PIN_WRITE(GPIOA, 7, GPIO_STATE_ONE);
+                            delay(1000000);
+                            //... completar
+                            delay(1000000);
+                        }
+                    }
+                \end{lstlisting}
         \end{enumerate}
         
 

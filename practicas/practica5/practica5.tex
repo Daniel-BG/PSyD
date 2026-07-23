@@ -1,0 +1,296 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+
+\practica{Configuración de Timers}
+
+    En esta práctica vamos a introducir el concepto de temporizador. Son unos periféricos del procesador que permiten, cada cierto tiempo, generar interrupciones y, con ello, disparar funcionalidades concretas que hayamos programado. En este caso programaremos uno para hacer parpadear un LED, y otro diferente para utilizar como \emph{debouncer} del botón.
+
+    \subsection{Objetivos}
+
+        \begin{itemize}
+            \item Entender el funcionamiento de los temporizadores internos del sistema.
+            \item Interconectar interrupciones de varios periféricos para lograr funcionalidades avanzadas.
+        \end{itemize}
+
+    \subsection{Fundamentos teóricos}
+
+        Un temporizador o \emph{timer} en un microcontrolador es un periférico hardware que, en esencia, es un contador digital. La cuenta se realiza en función de una señal de reloj de entrada, y al llegar a ciertos valores (configurables) dispara interrupciones.
+
+        Es capaz de medir intervalos de tiempo de forma independiente a la ejecución de código en la CPU, liberándola pues para que haga otras tareas en lugar de esperas activas a ciertos eventos. Los temporizadores suelen contar con varios registros para su control, entre otros:
+
+        \begin{itemize}
+            \item \REG{PSC} o \emph{prescaler}: Un registro que sirve para dividir la frecuencia de entrada. Normalmente, la frecuencia del procesador están en el orden de MHz. El prescaler suele dividirlo al orden de KHz o incluso menos, según las necesidades de temporización.
+            \item \REG{CNT} o \emph{counter}: El registro que lleva la cuenta actual del timer. Suma 1 cada vez que la señal de reloj, dividida entre el factor del prescaler, se activa. Su frecuencia de actualización $f_{CNT}$ es por tanto:
+
+                \[
+                    f_{CNT} = \frac{f_{CLK}}{\text{\REG{PSC}} + 1}
+                \]
+            \item \REG{ARR} o \emph{auto-reload}: Valor máximo de conteo. Cuando \REG{CNT} alcanza este valor, se resetea y genera un evento de interrupción que podremos controlar. El periodo de evento $T_{UEV}$ es por tanto:
+
+                \[
+                    T_{UEV} = \frac{\text{\REG{ARR}} + 1}{f_{CNT}} = \frac{(\text{\REG{PSC}} + 1)(\text{\REG{ARR}} + 1)}{f_{CLK}}
+                \]
+            \item \REG{CCR} o \emph{capture compare}: Registros que permiten diversas configuraciones de comparación con CNT (mayor que, menor, igual ...) para medir la duración de señales externas o generar formas de onda PWM, entre otras funcionalidades. En ocasiones también permiten interupciones adicionales a la de \REG{ARR}.
+        \end{itemize}
+
+        Podemos ver un diagrama de funcionamiento en la \Cref{fig:timer_block_diagram_vertical}.
+
+        \begin{figure}[htbp]
+        \centering
+        \begin{tikzpicture}[
+            node distance=1.2cm and 1.5cm,
+            block/.style={rectangle, draw=blue!70, fill=blue!10, thick, minimum width=3.2cm, minimum height=1.1cm, align=center, rounded corners=2pt},
+            signal/.style={font=\small\sffamily, color=black},
+            arrow/.style={-{Stealth[scale=1.2]}, thick, draw=blue!80!black}
+        ]
+
+            % Nodos verticales principales
+            \node (clk) [font=\bfseries\sffamily] {Reloj APB ($f_{CLK}$)};
+            
+            \node (psc) [block, below=0.8cm of clk] {\textbf{Prescaler (PSC)}\\Divisor de Reloj (16 bits)};
+            
+            \node (cnt) [block, below=1.2cm of psc] {\textbf{Contador (CNT)}\\Registro Incremental (16/32 bits)};
+            
+            % ARR a la derecha del contador para equilibrar
+            \node (arr) [block, right=1.2cm of cnt] {\textbf{Auto-Reload (ARR)}\\Límite de Conteo (16/32 bits)};
+            
+            % Evento UEV colocado abajo del contador
+            \node (event) [block, below=1.4cm of cnt, fill=orange!15, draw=orange!80!black] {\textbf{Evento UEV}\\Interrupción};
+
+            % Conexiones / Flechas
+            \draw [arrow] (clk) -- (psc);
+            \draw [arrow] (psc) -- node[right, signal] {$f_{CNT}$} (cnt);
+            \draw [arrow] (cnt) -- node[right, signal] {Desbordamiento / Match} (event);
+            \draw [arrow, dashed] (arr) -- (cnt);
+
+            % Retroalimentación de Reinicio (Reset al alcanzar ARR)
+            \draw [arrow] ($(cnt.west) + (0,0.2)$) -- ++(-0.8cm,0) |- node[pos=0.25, left, signal, align=right] {Reset\\(UEV)} ($(cnt.west) + (0,-0.2)$);
+
+            % Marco decorativo para la base de tiempo
+            \begin{scope}[on background layer]
+                \node[draw=gray!50, dashed, inner xsep=12pt, inner ysep=14pt, fit=(psc) (cnt) (arr), label=above:{\textbf{\sffamily Temporizador}}] {};
+            \end{scope}
+
+        \end{tikzpicture}
+        \caption{Diagrama de funcionamiento simplificado para los timers}
+        \label{fig:timer_block_diagram_vertical}
+        \end{figure}
+       
+
+    \subsection{Desarrollo de la práctica}
+
+        Lo primero, como siempre, es ir añadiendo a nuestro \texttt{bsp.h} lo necesario para poder gestionar los timers. Vamos a utilizar dos, \PER{TIM2} y \PER{TIM3}. Consulta \REFMAN[1.6] para ver las direcciones base de memoria, y \REFMAN[19.4] para los registros de los temporizadores que permitan crear el \lstinline|typedef| adecuado.
+
+        \begin{lstlisting}
+            //... completar
+            #define TIM2_BASE_ADDR   
+            #define TIM3_BASE_ADDR  
+
+            //Structure for Timers (TIM2 / TIM3)
+            typedef struct
+            {
+                volatile uint32_t CR1;        /*!< TIM control register 1,                  Address offset: 0x00 */
+                volatile uint32_t CR2;        /*!< TIM control register 2,                  Address offset: 0x04 */
+                //... completar
+            } TIM_TypeDef;
+
+            #define TIM2                ((TIM_TypeDef *) TIM2_BASE_ADDR)
+            #define TIM3                ((TIM_TypeDef *) TIM3_BASE_ADDR)
+        \end{lstlisting}
+
+        A continuación tenemos que crear las funciones necesarias para el control de los timers:
+
+        \begin{lstlisting}
+            //funciones de configuración
+            //... activa en CR1 el bit correspondiente para activar el contador
+            static inline void TIM_ENABLE_COUNTER(volatile TIM_TypeDef *TIMx, uint32_t enable);
+            //... activa el modo oneshot desde CR1
+            static inline void TIM_ENABLE_ONESHOT(volatile TIM_TypeDef *TIMx, uint32_t enable);
+            //... configura el registro PSC con el valor de preescalado
+            static inline void TIM_SET_PRESCALER(volatile TIM_TypeDef *TIMx, uint32_t value);
+            //... configura el registro ARR con el valor de autoreload
+            static inline void TIM_SET_AUTO_RELOAD(volatile TIM_TypeDef *TIMx, uint32_t value);
+            //... activa las interrupciones en el registro DIER
+            static inline void TIM_ENABLE_INT(volatile TIM_TypeDef *TIMx);
+            //funciones de uso
+            //... borra el flag pendiente del registro SR
+            static inline void TIM_CLEAR_FLAG(volatile TIM_TypeDef *TIMx);
+            //... comprueba si hay flag pendiente en el registro SR
+            static inline uint32_t TIM_CHECK_FLAG(volatile TIM_TypeDef *TIMx);
+        \end{lstlisting}
+
+        También es necesario crear una función que nos permita inicializar el timer, llamando a las anteriores de configuración:
+
+        \begin{lstlisting}
+            //congiura prescaler, autoreload, activa counter y oneshot si es necesario y activa interrupciones
+            static void TIM_INIT(TIM_TypeDef *TIMx, uint32_t preescaler, uint32_t autoreload, uint32_t enable_counter, uint32_t enable_oneshot);
+        \end{lstlisting}
+        
+        Y por último tendremos que activar los bits correspondientes en \REG{APB1ENR} (\REFMAN[5.3.13]), y adicionalmente activar en \REG{NVIC} (\REFMAN[9.1.12]) las líneas de interrupción adecuadas:
+
+        \begin{lstlisting}
+            RCC_APB1ENR->bits.TIM2EN = 1;
+            RCC_APB1ENR->bits.TIM3EN = 1;
+            TIM_INIT(TIM2, 15999, 500, 1, 0); //500 milisegundos, activo
+            TIM_INIT(TIM3, 15999,  10, 0, 1); //10 milisegundos, inactivo, oneshot
+            //Enable interrupts
+            NVIC_ENABLE_INT(TIM2_IRQn);
+            NVIC_ENABLE_INT(TIM3_IRQn);
+        \end{lstlisting}
+
+        Ahora podemos, por fin, hacer uso de las funciones de los timers para ver su efecto:
+
+        \begin{lstlisting}
+            // Handles Task 1: Blink LED1 (Green) each 0.5 seconds
+            void TIM2_IRQHandler(void) {
+                //... completar comprobar que el flag está activo
+                if () {
+                    //... completar borrar el flag
+                    //... completar funcionalidad deseada
+                }
+            }
+
+            void TIM3_IRQHandler(void) {
+                //... completar comprobar que el flag está activo
+                if () {
+                    //... completar borrar el flag
+                    //... completar funcionalidad deseada
+                }
+            }
+        \end{lstlisting}
+
+        La funcionalidad que queremos se muestra en la \Cref{fig:debounce_tim_flow}
+
+        \begin{figure}[htbp]
+        \centering
+        \begin{tikzpicture}[
+            node distance=0.8cm and 1.2cm,
+            block/.style={rectangle, draw=blue!80, fill=blue!5, thick, minimum width=3.6cm, minimum height=0.8cm, align=center, rounded corners=3pt, font=\small},
+            decision/.style={diamond, draw=orange!80!black, fill=orange!10, thick, inner sep=1pt, align=center, font=\small},
+            event/.style={ellipse, draw=green!60!black, fill=green!10, thick, align=center, font=\small},
+            exit/.style={ellipse, draw=red!60!black, fill=red!10, thick, align=center, font=\small},
+            arrow/.style={-{Stealth[scale=1.0]}, thick, draw=gray!80!black},
+            labeltext/.style={font=\fontsize{7}{8}\selectfont, color=gray!90!black}
+        ]
+
+            % --- COLUMNA IZQUIERDA: TIM2 (Independiente) ---
+            \node (tim2_start) [event] {\textbf{Interrupción}};
+            \node (tim2_toggle) [block, below=0.6cm of tim2_start] {Conmutar LED Verde\\(PB1)};
+            
+            \draw [arrow] (tim2_start) -- (tim2_toggle);
+
+            % --- COLUMNA DERECHA: Botón EXTI0 + TIM3 Debounce ---
+            \node (btn_evt) [event, right=3.2cm of tim2_start] {\textbf{Pulsación Botón}\\(PA0 / EXTI0)};
+            
+            \node (ext0_chk) [decision, below=0.5cm of btn_evt] {¿Bit \texttt{PR} activo\\en \texttt{EXTI}?};
+            
+            \node (ext0_exit) [exit, left=0.8cm of ext0_chk] {Fin ISR};
+
+            \node (ext0_actions) [block, below=0.6cm of ext0_chk] {
+                1. Borrar bit de \texttt{PR}\\
+                2. Desactivar interrupción (\texttt{IMR})\\
+                3. Reiniciar \texttt{CNT} = 0\\
+                4. Activar \texttt{TIM3} (\texttt{CR1})
+            };
+
+            \node (tim3_fire) [event, below=0.8cm of ext0_actions] {\textbf{Interrupción}\\(Disparo \emph{One-shot})};
+            
+            % Primer filtro TIM3: Flag en SR
+            \node (tim3_sr_chk) [decision, below=0.5cm of tim3_fire] {¿Flag de int.\\activo en \texttt{SR}?};
+            
+            \node (tim3_exit) [exit, left=0.8cm of tim3_sr_chk] {Fin ISR};
+
+            % Segundo filtro TIM3: Estado PA0
+            \node (tim3_pa0_chk) [decision, below=0.6cm of tim3_sr_chk] {¿PA0 sigue en '1'\\(\texttt{IDR})?};
+
+            \node (tim3_toggle) [block, below=0.6cm of tim3_pa0_chk] {Conmutar LED PA7};
+
+            \node (tim3_clean) [block, below=0.8cm of tim3_toggle] {
+                1. Borrar flag en \texttt{SR} (\texttt{TIM3})\\
+                2. Limpiar rebotes en \texttt{PR} (\texttt{EXTI})\\
+                3. Reactivar interrupción en \texttt{IMR}
+            };
+
+            % --- CONEXIONES EXTI0 ---
+            \draw [arrow] (btn_evt) -- (ext0_chk);
+            \draw [arrow] (ext0_chk) -- node[right, labeltext] {Sí} (ext0_actions);
+            \draw [arrow] (ext0_chk) -- node[above, labeltext] {No} (ext0_exit);
+            
+            \draw [arrow, dashed] (ext0_actions) -- node[right, labeltext] {Espera cuenta (Timer)} (tim3_fire);
+            
+            % --- CONEXIONES TIM3 ---
+            \draw [arrow] (tim3_fire) -- (tim3_sr_chk);
+            \draw [arrow] (tim3_sr_chk) -- node[above, labeltext] {No} (tim3_exit);
+            \draw [arrow] (tim3_sr_chk) -- node[right, labeltext] {Sí} (tim3_pa0_chk);
+            
+            % Evaluar PA0
+            \draw [arrow] (tim3_pa0_chk) -- node[right, labeltext] {Sí (Válido)} (tim3_toggle);
+            \draw [arrow] (tim3_toggle) -- (tim3_clean);
+            
+            % Si PA0 es 0 (Rebote), esquiva la conmutación y entra por arriba a la caja de limpieza
+            \draw [arrow] (tim3_pa0_chk.east) -- ++(1.1,0) node[midway, above, labeltext] {No (Rebote)} -- ++(0,-3.8) -| ($(tim3_clean.north) + (0.2, 0)$);
+
+            % --- MARCOS GRUPALES ---
+            \begin{scope}[on background layer]
+                % Marco TIM2
+                \node[draw=purple!40, fill=purple!5, dashed, inner xsep=8pt, inner ysep=8pt, fit=(tim2_start) (tim2_toggle), label=above:{\textbf{\sffamily Temporizador TIM2}}] {};
+                
+                % Marco EXTI0
+                \node[draw=blue!40, fill=blue!5, dashed, inner xsep=8pt, inner ysep=8pt, fit=(btn_evt) (ext0_chk) (ext0_actions) (ext0_exit), label=above:{\textbf{\sffamily Botón PA0 en EXTI0}}] {};
+
+                % Marco TIM3
+                \node[draw=orange!50, fill=orange!5, dashed, inner xsep=8pt, inner ysep=8pt, fit=(tim3_fire) (tim3_sr_chk) (tim3_pa0_chk) (tim3_toggle) (tim3_clean) (tim3_exit), label=left:{\textbf{\sffamily Temporizador TIM3}}] {};
+            \end{scope}
+
+        \end{tikzpicture}
+        \caption{Diagrama de flujo funcional de las interrupciones.}
+        \label{fig:debounce_tim_flow}
+        \end{figure}
+
+        \begin{itemize}
+            \item \PER{TIM2} enciende o apaga el led verde (PB1) cada vez que se dispara. Para ello, asegúrate de haber activado dicho puerto y pin como \PER{GPIO}.
+            \item \PER{TIM3} sirve como \emph{debouncer} para el botón (en PA0). Para ello debemos conseguir que, al pulsarse el botón, se inhabilite durante el tiempo que tarde el timer en dispararse. Si tras ese tiempo el botón sigue pulsado, contaremos que es una pulsación de verdad. En caso contrario, lo omitiremos. En ambos casos, al terminar el temporizador volveremos a activar las interrupciones del botón. Como está en modo \emph{oneshot}, cada vez que lo activemos se disparará solo una vez, evitando problemas.
+        \end{itemize}
+            
+        Para el botón, debemos comprobar tras la activación que el bit correspondiente de \REG{PR} está activo en \PER{EXTI} (\REFMAN[10.9.6]). Si es así, lo borramos y a continuación desactivamos la interrupción desde el registro \REG{IMR} (\REFMAN[10.9.1]). Finalmente activamos el temporizador, reseteando \REG{CNT} a cero y activándolo desde \REG{CR1} (\REFMAN[19.4.1]).
+        
+        \begin{lstlisting}
+            void EXTI0_IRQHandler(void)
+            {
+                //... comprobar si la interrupción está pendiente
+                if () {
+                    //... borrar bit pendiente
+                    //... desactivar interrupciones de botón
+                    //... resetear cuenta de timer
+                    //... activar timer
+                }
+            }
+        \end{lstlisting}
+
+        En cuanto al timer, debemos en primer lugar comprobar y borrar si es necesario el flag de interrupción desde \REG{SR} (\REFMAN[19.4.5]). A continuación, y si el botón sigue pulsado (podemos comprobarlo desde el registro \REG{IDR} del \PER{GPIO} (\REFMAN[6.4.5])), efectuar la función deseada (por ejemplo hacer parpadear el LED conectado a PA7). Tras ello, borraremos interrpciones pendientes del botón (por si se hubiera quedado pillado con rebotes) desde \REG{PR} de \PER{EXTI} (\REFMAN[10.9.6]), y re-activaremos las interrupciones de botón en \REG{IMR} (\REFMAN[10.9.1]). Una cuestión importante es que, gracias a haber configurado el temporizador en modo \emph{oneshot}, no es necesario desactivar sus propias interrupciones ya que no volverá a dispararse hasta reiniciar la cuenta.
+
+        \begin{lstlisting}            
+            // Debounce Lockout Timer Handler (Fires 10ms after initial edge)
+            void TIM3_IRQHandler(void) {
+                //... comprobar flag de interrupción
+                if () {
+                    //... borrar flag de interrpción
+                    //... verificar que sigue pulsado PA0
+                    if () {
+                        //... funcionalidad... Toggle led de PA7
+                    }
+                    //... borrar interrpciones pendientes para EXTI0 (botón) 
+                    //... reactivar interrupciones para EXTI0
+                }
+            }
+        \end{lstlisting}
+    
+
+
+    
+    \subsection{Para hacer más}
+        Hay un ``temporizador'' especial llamado \PER{RTC} (\emph{Real Time Clock}) capaz de llevar la cuenta de la hora y fecha actual de forma precisa. Con ello, además, puede generar interrupciones a largo plazo. Se utiliza principalmente para realizar esperas largas donde el procesador está dormido mientras espera la interrupción. Consulta la documentación y utilízalo para hacer parpadear el led azul (PA5) cada 5 segundos.
+
+\end{document}

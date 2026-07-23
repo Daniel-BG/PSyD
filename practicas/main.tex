@@ -17,6 +17,13 @@
 
 
 
+\newcounter{numpractica}
+\newcommand{\practica}[1]{%
+  \stepcounter{numpractica}%
+  \section{Práctica \thenumpractica: #1}%
+}
+
+
 % Definimos el comando \pendientes con texto rojo y fondo negro
 \newcommand{\pendiente}[1]{\colorbox{black}{\textcolor{red}{\textbf{#1}}}}
 
@@ -158,6 +165,8 @@
 \subfile{practica3/practica3.tex}
 \newpage
 \subfile{practica4/practica4.tex}
+\newpage
+\subfile{practica5/practica5.tex}
 \newpage
 
 \end{document}

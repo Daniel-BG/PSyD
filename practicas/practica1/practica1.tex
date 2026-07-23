@@ -3,7 +3,7 @@
 \begin{document}
 
 
-\section{Práctica 1: Periféricos mapeados en memoria (MMIO): Entrada/Salida de propósito general (GPIO)}
+\practica{Periféricos mapeados en memoria (MMIO): Entrada/Salida de propósito general (GPIO)}
 
     \subsection{Objetivos}
         \begin{itemize}
@@ -242,6 +242,27 @@
                 void delay(int loops) {
                     for (int i = 0; i < loops; i++) {
                         __asm("nop");
+                    }
+                }
+            \end{lstlisting}
+
+            Nuestra función \lstinline|main.c| tendrá por tanto esta pinta:
+
+            \begin{lstlisting}
+                int main(void)
+                {
+                    //activar reloj de GPIOA en RCC_AHB1ENR
+                    //configurar Pin0-GPIOA como salida
+                    //configurar Pin0-GPIOA modo push-pull
+                    //configurar Pin0-GPIOA velocidad alta
+                    //configurar Pin0-GPIOA con pullup/down desactivado
+
+                    /* Loop forever */
+                    for(;;) {
+                        //encender LED
+                        delay(1000000);
+                        //apagar LED
+                        delay(1000000);
                     }
                 }
             \end{lstlisting}
