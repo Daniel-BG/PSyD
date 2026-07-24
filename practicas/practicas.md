@@ -36,30 +36,17 @@ Las interrupciones permiten que el procesador ejecute cierta funcionalidad únic
 
 ---
 
-## Práctica 5 - Entrada / Salida mediante interrupciones - Control de rebotes y timers y cuenta de tiempo real
+## [Práctica 5](practica5/practica5.pdf) - Temporizadores
 
-    Objetivos:
-        * Aprender a utilizar los timers, y el RTC para eventos temporizados
-        * Aprender a enmascarar y desenmascarar interrupciones para conseguir funcionalidades complejas
-        * Ver la diferencia entre la precisión de los timers internos y el RTC
+Determinados eventos en el procesador requieren de una ejecución temporizada. En lugar de utilizar contadores y esperas activas, los temporizadores proporcionan una manera determinista de ejecutar funciones periódicamente. En esta práctica se utilizarán para hacer parpadear unos LEDs, y adicionalmente controlar los rebotes de una entrada como un botón.
 
-    Para hacer más -> 
+---
 
-## Práctica 6 - Drivers avanzados - Display (Avanzados porque le mandas comandos en lugar de ser solo config de registros)
+## [Práctica 6](practica6/practica6.pdf) - Periféricos externos - Display y Drivers
 
-    Objetivos:
-        * Enteder el concepto de driver
-        * Trabajar con un periférico interno que controla uno externo
-        * Aprender a configurar los periféricos externos
+Hasta ahora, todos los periféricos que hemos visto son internos al procesador. Cumplen funciones diferentes a la de la simple ejecución de instrucciones, pero no se "ven" desde fuera. En esta práctica conectaremos con el display externo, y escribiremos un pequeño driver para controlarlo a través del controlador de memoria flexible (FMC) del procesador.
 
-    Partir del ejemplo de LCD_Pictures (se puede comentar muchas cosas si se overridea la funcion HAL_delay, que estaría bien implementar bien)
-    Introducir PWM a la parte de la backlight 
-
-    The FSMC (Flexible Static Memory Controller) on STM32 microcontrollers is a built-in peripheral designed to interface with external memories (like SRAM, NOR/NAND Flash, and PSRAM) and parallel devices (like TFT LCDs). It maps external devices directly to the microcontroller's memory address space, allowing you to read and write to them as if they were internal RAM
-
-    ST7789H2 sitronix for the LCD driver. Al parecer el TFT tiene también sus cosas pero no hay datasheet.
-
-    Para hacer más -> Amplía la librería con funciones de dibujado de líneas, rectángulos, círculos... Explora la documentación para ver si hay maneras más rápidas de pintar la pantalla.
+---
 
 ## Práctica 7 - Buses de expansión - I2C y pantalla táctil
 
