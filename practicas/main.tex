@@ -1,26 +1,31 @@
 \documentclass[svgnames,spanish,11pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
-\usepackage{babel}
+\usepackage[es-tabla]{babel}
 \usepackage{geometry}
 \usepackage[most]{tcolorbox}
 \usepackage{hyperref}
 \usepackage{cleveref} 
+\crefname{table}{tabla}{tablas}
+\Crefname{table}{Tabla}{Tablas}
 \usepackage{xcolor}
 \usepackage{xurl}
 \usepackage{listings}
 \usepackage{lstautogobble}
 \usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{colortbl}
+\usepackage{multirow}
+\usepackage{tabularx}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, matrix, arrows, calc, shapes, babel, fit, backgrounds, decorations.pathreplacing}
 
 \usepackage{subfiles} % Required for subfile compilation
 
 
-
 \newcounter{numpractica}
-\newcommand{\practica}[1]{%
-  \stepcounter{numpractica}%
-  \section{Práctica \thenumpractica: #1}%
+\newcommand{\practica}[2]{%
+  \setcounter{numpractica}{#1}%
+  \section{Práctica \thenumpractica: #2}%
 }
 
 
@@ -174,6 +179,10 @@
 \subfile{practica4/practica4.tex}
 \newpage
 \subfile{practica5/practica5.tex}
+\newpage
+\subfile{practica6/practica6.tex}
+\newpage
+\subfile{practica7/practica7.tex}
 \newpage
 
 \end{document}

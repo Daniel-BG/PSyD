@@ -48,14 +48,10 @@ Hasta ahora, todos los periféricos que hemos visto son internos al procesador. 
 
 ---
 
-## Práctica 7 - Buses de expansión - I2C y pantalla táctil
+## [Práctica 7](practica7/practica7.pdf) - Buses de expansión - I2C y pantalla táctil
 
-    Objetivos:
-        * Comprender el funcionamiento y uso de un bus de expansión, así como sus líneas de conexión
-        * Comprender las interrupciones externas a traves de buses de expansión
-        * Programar e interactuar con un dispositivo remoto
-
-    Para hacer más -> Crea funciones de calibrado de la pantalla táctil para poder ajustar la pulsación recibida al marco real de la pantalla.
+Los buses de expansión permiten la interconexión de numerosos dispositivos externos a través de líneas compartidas de datos. Esto permite una gran flexibilidad a la hora de ampliar las funcionalidades de nuestro sistema empotrado. En esta práctica, vemos uno de los buses más extendidos (el I2C), y aprendemos a configurar los periféricos internos del procesador necesarios para utilizarlo. Con él, nos conectaremos al panel táctil para recibir las coordenadas pulsadas por el usuario.
+alla.
 
 ## Práctica 8 - DFU (hay ejemplo para ello)
 
@@ -116,11 +112,3 @@ Laboratorio 13: Multitarea bajo un kernel de planificación no expropiativo.
 Laboratorio 14: Multitarea bajo RTOS uC/OS-II.
 Proyecto: Recreativa 1978. Space Invaders, Taito Corp.
 
-
-
-
-Quiero que me ayudes a redactar una práctica para un curso de sistemas empotrados. En el curso estamos utilizando las placas 32F723EDISCOVERY (adjunto documentación relacionada). El enunciado debe estar redactado en latex, introduciendo poco a poco los conceptos básicos y construyendo código de una forma guiada y progresiva, dando snippets que se deberán rellenar siguiendo la documentación. 
-
-Para esta práctica, el objetivo es entender cómo funcionan los periféricos mapeados en memoria mediante un LED encendido desde el sistema de GPIO. Te adjunto un código de ejemplo para otra placa similar. Deberíamos tener primero una explicación de todo el sistema (idealmente con referencias a la documentación) y luego el desarrollo del código guiado.
-
-Quiero que me devuelvas el enunciado en latex de la práctica, gracias!

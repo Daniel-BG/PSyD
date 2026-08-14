@@ -13,4 +13,5 @@ Bienvenido al sitio web del material de la asignatura de Programación de Sistem
 * 📁 [Enunciado de la Práctica 4](practicas/practica4/practica4.pdf)
 * 📁 [Enunciado de la Práctica 5](practicas/practica5/practica5.pdf)
 * 📁 [Enunciado de la Práctica 6](practicas/practica6/practica6.pdf)
+* 📁 [Enunciado de la Práctica 7](practicas/practica7/practica7.pdf)
 
