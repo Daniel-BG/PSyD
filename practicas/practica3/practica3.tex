@@ -208,11 +208,48 @@
 
         \textbf{NOTA:} El nombre del puerto puede no ser necesariamente \texttt{ttyACM0}, aunque en linux al menos es el valor por defecto. En Windows, por ejemplo, suele llamarse \texttt{COMx}, siendo x un número arbitrario.
         
+        \subsubsection{Envío de cadenas de texto por UART}
 
+            Aunque mola mucho programar en \emph{bare-metal}, también es útil partir de librerías ya implementadas para facilitar la vida a los programadores. Podemos ampliar la funcionalidad de nuestra UART para imprimir mensajes de depuración (así en próximas prácticas podremos depurar vía mensajes, en ocasiones más cómodo e intuitivo que la depuración con \emph{breakpoints}). Incluye las siguientes funciones y prueba a depurar tu código con mensajes.
+
+            En \texttt{bsp.h} tendrás que añadir una función para escribir cadenas completas:
+
+            \begin{lstlisting}
+                void UART_WriteString(USART_TypeDef *usart, const char *str) {
+                    while (*str) {
+                        UART_TransmitByte(usart, *str++);
+                    }
+                }
+            \end{lstlisting}
+
+            En \texttt{main.c} tendrás que añadir la función de depuración en sí con las librerías necesarias auxiliares:
+
+            \begin{lstlisting}
+                #include <stdint.h>
+                #include <stdlib.h>
+                #include <stdio.h>
+                #include <string.h>
+                #include <stdarg.h>
+
+                void Debug_Printf(const char *fmt, ...)
+                {
+                    char buf[256];
+                    va_list args;
+                    va_start(args, fmt);
+                    vsnprintf(buf, sizeof(buf), fmt, args);
+                    va_end(args);
+
+                    UART_WriteString(USART6, buf);
+                }
+            \end{lstlisting}
+
+            Y listo! Puedes llamar a la función \texttt{Debug\_Printf} con el texto con formato que quieras, para imprimir los valores de variables, por ejemplo, o simplemente colocar mensajes de depuración por la UART.
 
     \subsection{Para hacer más}
 
-        Averigua cómo hacer transferencias en modo DMA para poder seguir ejecutando código mientras la UART hace su trabajo ``sola''.
+        Investiga las interrupciones de la UART para evitar tener que hacer esperas activas que consuman recursos de CPU. 
+
+
 
 
 \end{document}

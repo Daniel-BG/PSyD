@@ -18,6 +18,8 @@
 \usepackage{tabularx}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, matrix, arrows, calc, shapes, babel, fit, backgrounds, decorations.pathreplacing}
+\usepackage{array}
+\usepackage{amssymb}
 
 \usepackage{subfiles} % Required for subfile compilation
 
@@ -92,6 +94,11 @@
 \definecolor{perbg}{HTML}{F4F4E5}     % Amarillo suave (Registros)
 \definecolor{pertext}{HTML}{7A7A00}
 
+\definecolor{anbg}{HTML}{F5EBE6}    % Marrón café suave 
+\definecolor{antext}{HTML}{5A2A00}
+
+%\definecolor{grybg}{HTML}{EAECEE}     % Gris pizarra (General/Otros)
+%\definecolor{grytext}{HTML}{2E4053}
 
 \definecolor{membg}{HTML}{F3F4F6}     % Gris técnico (Direcciones de memoria)
 \definecolor{memtext}{HTML}{1F2937}
@@ -125,6 +132,9 @@
 }
 \newcommand{\LCDMAN}[1][]{%
   \codebubble{lcdbg}{lcdtext}{ST7789H2\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
+}
+\newcommand{\ANMAN}[1][]{%
+  \codebubble{anbg}{antext}{an2606\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
 }
 \newcommand{\REG}[1]{\codebubble{regbg}{regtext}{\textbf{#1}}}
 \newcommand{\PER}[1]{\codebubble{perbg}{pertext}{\textbf{#1}}}
@@ -183,6 +193,8 @@
 \subfile{practica6/practica6.tex}
 \newpage
 \subfile{practica7/practica7.tex}
+\newpage
+\subfile{practica8/practica8.tex}
 \newpage
 
 \end{document}

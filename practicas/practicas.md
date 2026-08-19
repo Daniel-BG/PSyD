@@ -53,62 +53,10 @@ Hasta ahora, todos los periféricos que hemos visto son internos al procesador. 
 Los buses de expansión permiten la interconexión de numerosos dispositivos externos a través de líneas compartidas de datos. Esto permite una gran flexibilidad a la hora de ampliar las funcionalidades de nuestro sistema empotrado. En esta práctica, vemos uno de los buses más extendidos (el I2C), y aprendemos a configurar los periféricos internos del procesador necesarios para utilizarlo. Con él, nos conectaremos al panel táctil para recibir las coordenadas pulsadas por el usuario.
 alla.
 
-## Práctica 8 - DFU (hay ejemplo para ello)
+---
 
-## Práctica 9 - Multitarea cooperativa
+## [Práctica 8](practica8/practica8.pdf) - Bootloader y actualización automática
 
-    Objetivos:
-        * Comprender cómo diseñar un framework para la ejecución múltiple de tareas
-        * Comprender las limitaciones y ventajas de este método para ejecución en tiempo real.
-        * Entender la utilidad de SystickHandler
+Hacer aplicaciones perfectas a la primera es algo muy complicado. Aún habiéndolas hecho, normalmente se requieren actualizaciones a lo largo del tiempo. Una vez hemos fabricado un dispositivo y está operativo, el enlace de depuración se suele perder, así que se requieren métodos más sofisticados para reprogramarlo. Uno de los más extendidos es el de programar un pequeño Bootloader, o cargador, que se encarga además de actualizar el código principal si es necesario. En esta práctica programaremos un bootloader capaz de descargar aplicaciones via Wifi, grabarlas en la Flash, y por último cederles el control. Aprenderemos además cómo tenemos que compilar nuestras aplicaciones para que el bootloader las pueda cargar.
 
-    Para hacer más -> Añade tareas extra más complejas
-
-## Práctica 9B - Multitarea expropiativa
-
-    Objetivos 
-        * Comprender y diseñar un framework para la ejecución de múltiples tareas - aunque se bloqueen
-        * Entender la pila de funciones, registros, etc
-
-    Para hacer más -> Ampliar el planificador para que si una tarea de baja prioridad se atasca, no atasque al resto.
-
-## Práctica 10 - Zephyr RTOS - Introducción
-    
-    https://docs.zephyrproject.org/latest/develop/tools/stm32cubeide.html
-
-## Práctica 11 - Zephyr RTOS - Multitarea, semáforos e interrupciones
-
-## Práctica 12 - Zephyr RTOS - Device tree y drivers
-
-## Práctica 13 - Zephyr RTOS - MCUBoot y OTA
-
-## Práctica 14 - 
-
-## Práctica 4 - Técnicas de depuración SWD y USB?
-
-## Práctica 6 - Entrada / Salida por DMA - Sonido
-
-
-Falta por meter en algún lado:
-    Temporizadores (quizá en la 3 para que emita cada X tiempo?)
-
-
-
-
-Transparencias de laboratorios:
-Laboratorio 1: Acceso elemental a dispositivos (i): dispositivos externos mapeados en memoria.
-Laboratorio 2: Acceso elemental a dispositivos (ii): dispositivos internos mapeados en memoria y dispositivos externos conectados a puertos de E/S.
-Laboratorio 3: Drivers de dispositivos elementales: salida por leds y displays 7-segmentos.
-Laboratorio 4: E/S programada: control de una UART y comunicación con un terminal serie.
-Laboratorio 5: Gestión básica de interrupciones: programación de un reloj de tiempo real.
-Laboratorio 6: Medida del tiempo: control de temporizadores y entrada por pulsadores y keypads.
-Laboratorio 7: Salida por un LCD.
-Laboratorio 8: Bus IIC: lectura/escritura de una EEPROM.
-Laboratorio 9: E/S por DMA y Bus IIS: reproducción/grabación de sonido con un Audio Codec.
-Laboratorio 10: Conversión analógico-digital: entrada por un touchpad.
-Laboratorio 11: Autoarranque desde ROM.
-Laboratorio 12: Multitarea cooperativa.
-Laboratorio 13: Multitarea bajo un kernel de planificación no expropiativo.
-Laboratorio 14: Multitarea bajo RTOS uC/OS-II.
-Proyecto: Recreativa 1978. Space Invaders, Taito Corp.
-
+---
