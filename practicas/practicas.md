@@ -60,3 +60,10 @@ alla.
 Hacer aplicaciones perfectas a la primera es algo muy complicado. Aún habiéndolas hecho, normalmente se requieren actualizaciones a lo largo del tiempo. Una vez hemos fabricado un dispositivo y está operativo, el enlace de depuración se suele perder, así que se requieren métodos más sofisticados para reprogramarlo. Uno de los más extendidos es el de programar un pequeño Bootloader, o cargador, que se encarga además de actualizar el código principal si es necesario. En esta práctica programaremos un bootloader capaz de descargar aplicaciones via Wifi, grabarlas en la Flash, y por último cederles el control. Aprenderemos además cómo tenemos que compilar nuestras aplicaciones para que el bootloader las pueda cargar.
 
 ---
+
+
+## [Práctica 9](practica9/practica9.pdf) - Creación automática de BSP
+
+La creación manual de los BSP tiene la gran ventaja de utilizar única y exclusivamente las funcionalidades que nosotros queramos. Sin embargo, en ocasiones es muy deseable dejar este trabajo a otros, y conseguir un BSP robusto de manera automática, aunque incluya más funciones de la cuenta (con su consecuente coste en uso de memoria). En esta práctica aprendemos a crear automáticamente un BSP con la herramienta STMCubeMX, que nos permitirá seleccionar todos los periféricos que vayamos a utilizar, con su configuración incluida, para preocuparnos sólo de escribir la lógica del programa.
+
+---
