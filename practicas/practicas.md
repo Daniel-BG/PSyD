@@ -55,15 +55,15 @@ alla.
 
 ---
 
-## [Práctica 8](thingsboard/thingsboard.pdf) - Conexión y control remoto
+## [Práctica 8](thingsboard_data_control/thingsboard_data_control.pdf) - Comunicación remota con ThingsBoard
 
 Aunque numerosos sistemas empotrados viven sus días aislados del mundo exterior (internet), muchos otros requieren de comunicación constante. Existen infinidad de plataformas de control, así como protocolos, que nos permiten precisamente esto. Podemos tanto recibir información, como mandar comandos de control desde y hacia nuestros dispositivos. En esta práctica vemos un ejemplo utilizando MQTT y Thingsboard.
 
 ---
 
-## [Práctica 9](bootloaders_and_ota/bootloaders_and_ota.pdf) - Bootloader y actualización automática
+## [Práctica 9](thingsboard_ota/thingsboard_ota.pdf) - Actualización remota (OTA) utilizando ThingsBoard
 
-Hacer aplicaciones perfectas a la primera es algo muy complicado. Aún habiéndolas hecho, normalmente se requieren actualizaciones a lo largo del tiempo. Una vez hemos fabricado un dispositivo y está operativo, el enlace de depuración se suele perder, así que se requieren métodos más sofisticados para reprogramarlo. Uno de los más extendidos es el de programar un pequeño Bootloader, o cargador, que se encarga además de actualizar el código principal si es necesario. En esta práctica programaremos un bootloader capaz de descargar aplicaciones via Wifi, grabarlas en la Flash, y por último cederles el control. Aprenderemos además cómo tenemos que compilar nuestras aplicaciones para que el bootloader las pueda cargar.
+Hacer aplicaciones perfectas a la primera es algo muy complicado. Aún habiéndolas hecho, normalmente se requieren actualizaciones a lo largo del tiempo. Una vez hemos fabricado un dispositivo y está operativo, el enlace de depuración se suele perder, así que se requieren métodos más sofisticados para reprogramarlo. Uno de los más extendidos es el de dividir la memoria en dos, para crear un buffer de ping-pong donde una aplicación será la activa, y la otra la actualizable. En esta práctica ampliamos la anterior, añadiendo la capacidad de descargar aplicaciones via Wifi, grabarlas en la Flash, y por último cederles el control. Aprenderemos además cómo tenemos que compilar nuestras aplicaciones para que se puedan cargar de esta manera dual.
 
 ---
 

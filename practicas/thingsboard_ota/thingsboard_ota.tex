@@ -1,0 +1,127 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+
+\practica{Actualización remota (OTA) utilizando \emph{ThingsBoard}}
+
+
+    \subsection{Objetivos}
+        \begin{itemize}
+            \item 
+            \item 
+            \item 
+        \end{itemize}
+
+    \subsection{Fundamentos teóricos}
+
+            \begin{tikzpicture}[
+                font=\sffamily,
+                % Core component styles
+                mcu/.style={draw, thick, rectangle, rounded corners, fill=gray!10, minimum width=3.0cm, minimum height=1.3cm, align=center},
+                flash/.style={draw, thick, rectangle, fill=white, minimum width=3.2cm, minimum height=4.6cm},
+                slot/.style={draw, thick, rectangle, minimum height=1.1cm, minimum width=2.8cm, align=center, inner sep=3pt, font=\small},
+                active_app/.style={fill=blue!15, draw=blue!80!black},
+                inactive_app/.style={fill=gray!20, draw=gray!50},
+                new_app/.style={fill=green!15, draw=green!70!black},
+                broker/.style={draw, thick, ellipse, fill=orange!15, draw=orange!80!black, minimum width=2.4cm, minimum height=1.0cm, align=center, font=\small},
+                % Arrow styles
+                arrow_std/.style={-{Stealth[scale=0.9]}, thick},
+                arrow_flash/.style={-{Stealth[scale=0.9]}, thick, red!70!black},
+                arrow_mqtt/.style={-{Stealth[scale=0.9]}, thick, orange!70!black, dashed},
+                label_txt/.style={font=\sffamily\tiny\bfseries, align=center},
+                phase_box/.style={draw=gray!40, fill=gray!2, dashed, rounded corners=8pt, inner sep=12pt}
+            ]
+
+            % Coordinates for 4 Phase Centers (Clockwise Grid Layout)
+            \coordinate (P1) at (0, 0);        % Top-Left: Phase 1
+            \coordinate (P2) at (9, 0);     % Top-Right: Phase 2
+            \coordinate (P3) at (9, -9);  % Bottom-Right: Phase 3
+            \coordinate (P4) at (0, -9);     % Bottom-Left: Phase 4
+
+            % ==============================================================================
+            % PHASE 1: Normal Operation (App A Active)
+            % ==============================================================================
+            \node[font=\bfseries\large] (t1) at ($(P1)+(0,3.6)$) {1. Startup (App A Active)};
+            \node[mcu] (mcu1) at ($(P1)+(-2.0,-0.8)$) {\textbf{MCU}\\Running App A};
+            \node[font=\scriptsize\bfseries, text=blue!80!black, below= 2pt of mcu1] {VTOR $\to$ 0x08000000};
+
+            \node[flash] (f1) at ($(P1)+(2.0,-0.2)$) {};
+            \node[font=\bfseries\small, above=-0.1cm of f1.north] {Flash Memory};
+            \node[slot, inactive_app] (f1_boot) at ($(P1)+(2.0,1.3)$) {\textbf{Boot Bytes}\\Points to A};
+            \node[slot, active_app] (f1_slota) at ($(P1)+(2.0, -0.1)$) {\textbf{Slot A} \\ (0x08000000)\\Running V1};
+            \node[slot, inactive_app] (f1_slotb) at ($(P1)+(2.0, -1.5)$) {\textbf{Slot B} \\ (0x08040000)\\Old / Empty};
+
+            \draw[arrow_std] (f1_boot.west) -| node[pos=0.5, above, font=\tiny] {Initial Boot} (mcu1.north);
+
+            % ==============================================================================
+            % PHASE 2: Update Received & Flashed
+            % ==============================================================================
+            \node[font=\bfseries\large] (t2) at ($(P2)+(0,3.6)$) {2. Update Received \& Flashed};
+            \node[broker] (br2) at ($(P2)+(-2.0,1.8)$) {\textbf{MQTT}\\Broker};
+            \node[mcu] (mcu2) at ($(P2)+(-2.0,-0.8)$) {\textbf{MCU}\\Running App A};
+
+            \node[flash] (f2) at ($(P2)+(2.0,-0.2)$) {};
+            \node[font=\bfseries\small, above=-0.1cm of f2.north] {Flash Memory};
+            \node[slot, inactive_app] (f2_boot) at ($(P2)+(2.0,1.3)$) {\textbf{Boot Bytes}\\Points to A};
+            \node[slot, active_app] (f2_slota) at ($(P2)+(2.0, -0.1)$) {\textbf{Slot A} \\ (0x08000000)\\Downloading...};
+            \node[slot, new_app] (f2_slotb) at ($(P2)+(2.0, -1.5)$) {\textbf{Slot B} \\ (0x08040000)\\Flashing V2...};
+
+            \draw[arrow_mqtt, <-] (mcu2.north) -- (br2.south) node[midway, right, label_txt] {Download\\App V2};
+            \draw[arrow_flash] (mcu2.east) -- (f2_slotb.west) node[midway, below, label_txt, text=red!70!black] {Write \\ Image};
+
+            % ==============================================================================
+            % PHASE 3: Configure Boot Switch
+            % ==============================================================================
+            \node[font=\bfseries\large] (t3) at ($(P3)+(0,3.6)$) {3. Configure Boot Switch};
+            \node[mcu] (mcu3) at ($(P3)+(-2.0,-0.8)$) {\textbf{MCU}\\Running App A};
+
+            \node[flash] (f3) at ($(P3)+(2.0,-0.2)$) {};
+            \node[font=\bfseries\small, above=-0.1cm of f3.north] {Flash Memory};
+            \node[slot, new_app] (f3_boot) at ($(P3)+(2.0,1.3)$) {\textbf{Boot Bytes}\\Update to B};
+            \node[slot, active_app] (f3_slota) at ($(P3)+(2.0, -0.1)$) {\textbf{Slot A} \\ (0x08000000)\\Finalizing...};
+            \node[slot, new_app] (f3_slotb) at ($(P3)+(2.0, -1.5)$) {\textbf{Slot B} \\ (0x08040000)\\V2 Verified};
+
+            \draw[arrow_flash] (mcu3.north) |- (f3_boot.west) node[pos=0.7, above, label_txt, text=red!70!black] {1. Set Boot Flag};
+            \draw[arrow_std, red!70!black] (mcu3.south) -- ++(0,-0.4) node[below, label_txt, text=red!70!black] {2. System Reset};
+
+            % ==============================================================================
+            % PHASE 4: Post-Update Operation (App B Active)
+            % ==============================================================================
+            \node[font=\bfseries\large] (t4) at ($(P4)+(0,3.6)$) {4. Post-Update (App B Active)};
+            \node[mcu] (mcu4) at ($(P4)+(-2.0,-0.8)$) {\textbf{MCU}\\Running App B};
+            \node[font=\scriptsize\bfseries, text=green!70!black, below= 2pt of mcu4] {VTOR $\to$ 0x08040000};
+
+            \node[flash] (f4) at ($(P4)+(2.0,-0.2)$) {};
+            \node[font=\bfseries\small, above=-0.1cm of f4.north] {Flash Memory};
+            \node[slot, active_app] (f4_boot) at ($(P4)+(2.0,1.3)$) {\textbf{Boot Bytes}\\Points to B};
+            \node[slot, inactive_app] (f4_slota) at ($(P4)+(2.0, -0.1)$) {\textbf{Slot A} \\ (0x08000000)\\Old V1};
+            \node[slot, active_app] (f4_slotb) at ($(P4)+(2.0, -1.5)$) {\textbf{Slot B} \\ (0x08040000)\\Running V2};
+
+            \draw[arrow_std] (f4_boot.west) -| node[pos=0.5, above, font=\tiny] {New Boot} (mcu4.north);
+
+            % ==============================================================================
+            % BACKGROUND BOXES & PROCESS FLOW ARROWS
+            % ==============================================================================
+            \begin{pgfonlayer}{background}
+                \node[phase_box, fit=(t1) (mcu1) (f1) (f1_boot) (f1_slotb)] (box1) {};
+                \node[phase_box, fit=(t2) (br2) (mcu2) (f2) (f2_boot) (f2_slotb)] (box2) {};
+                \node[phase_box, fit=(t3) (mcu3) (f3) (f3_boot) (f3_slotb)] (box3) {};
+                \node[phase_box, fit=(t4) (mcu4) (f4) (f4_boot) (f4_slotb)] (box4) {};
+
+                % Clockwise flow arrows connecting phases
+                \draw[-{Stealth[scale=1.2]}, line width=1.5pt, gray!70] (box1.east) -- (box2.west);
+                \draw[-{Stealth[scale=1.2]}, line width=1.5pt, gray!70] (box2.south) -- (box3.north);
+                \draw[-{Stealth[scale=1.2]}, line width=1.5pt, gray!70] (box3.west) -- (box4.east);
+                \draw[-{Stealth[scale=1.2]}, line width=1.5pt, gray!70] (box4.north) -- (box1.south)
+                    node[midway, fill=white, inner sep=3pt, font=\sffamily\small\bfseries, text=gray!80!black] {Reciprocal Process (App B updates App A)};
+            \end{pgfonlayer}
+
+            \end{tikzpicture}
+
+    \subsection{Desarrollo de la práctica}
+
+    
+    \subsection{Para hacer más}
+
+\end{document}
