@@ -333,3 +333,6 @@ TSWLatexianTemp*
 #Others
 .vscode
 .github
+
+.metadata
+ESP01S_config.h

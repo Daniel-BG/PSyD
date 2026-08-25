@@ -25,9 +25,10 @@
 
 
 \newcounter{numpractica}
-\newcommand{\practica}[2]{%
-  \setcounter{numpractica}{#1}%
-  \section{Práctica \thenumpractica: #2}%
+\setcounter{numpractica}{0}%
+\newcommand{\practica}[1]{%
+  \stepcounter{numpractica}%
+  \section{Práctica \thenumpractica: #1}%
 }
 
 
@@ -178,25 +179,25 @@
 
 \newpage
 % Aquí se irán incluyendo los temas individuales
-\subfile{practica0/practica0.tex}
+\subfile{initial_config/initial_config.tex}
 \newpage
-\subfile{practica1/practica1.tex}
+\subfile{memory_mapped_io/memory_mapped_io.tex}
 \newpage
-\subfile{practica2/practica2.tex}
+\subfile{board_support_package/board_support_package.tex}
 \newpage
-\subfile{practica3/practica3.tex}
+\subfile{programmed_input_output/programmed_input_output.tex}
 \newpage
-\subfile{practica4/practica4.tex}
+\subfile{interrupts/interrupts.tex}
 \newpage
-\subfile{practica5/practica5.tex}
+\subfile{timers/timers.tex}
 \newpage
-\subfile{practica6/practica6.tex}
+\subfile{display_and_drivers/display_and_drivers.tex}
 \newpage
-\subfile{practica7/practica7.tex}
+\subfile{i2c_and_touch/i2c_and_touch.tex}
 \newpage
-\subfile{practica8/practica8.tex}
+\subfile{bootloaders_and_ota/bootloaders_and_ota.tex}
 \newpage
-\subfile{practica9/practica9.tex}
+\subfile{automated_bsp_cubemx/automated_bsp_cubemx.tex}
 \newpage
 
 \end{document}
