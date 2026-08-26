@@ -52,6 +52,9 @@ default.size.stdout \
 OBJDUMP_LIST += \
 thingsboard_ota.list \
 
+OBJCOPY_BIN += \
+thingsboard_ota.bin \
+
 
 # All Target
 all: main-build
@@ -75,12 +78,17 @@ thingsboard_ota.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
 	@echo 'Finished building: $@'
 	@echo ' '
 
+thingsboard_ota.bin: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "thingsboard_ota.bin"
+	@echo 'Finished building: $@'
+	@echo ' '
+
 # Other Targets
 clean:
-	-$(RM) default.size.stdout thingsboard_ota.elf thingsboard_ota.list thingsboard_ota.map
+	-$(RM) default.size.stdout thingsboard_ota.bin thingsboard_ota.elf thingsboard_ota.list thingsboard_ota.map
 	-@echo ' '
 
-secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST)
+secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST) $(OBJCOPY_BIN)
 
 fail-specified-linker-script-missing:
 	@echo 'Error: Cannot find the specified linker script. Check the linker settings in the build configuration.'

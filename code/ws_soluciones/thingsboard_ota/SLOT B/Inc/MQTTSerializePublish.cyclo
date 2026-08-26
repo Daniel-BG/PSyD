@@ -1,6 +1,0 @@
-../Inc/MQTTSerializePublish.c:31:5:MQTTSerialize_publishLength	2
-../Inc/MQTTSerializePublish.c:55:5:MQTTSerialize_publish	3
-../Inc/MQTTSerializePublish.c:104:5:MQTTSerialize_ack	2
-../Inc/MQTTSerializePublish.c:137:5:MQTTSerialize_puback	1
-../Inc/MQTTSerializePublish.c:151:5:MQTTSerialize_pubrel	1
-../Inc/MQTTSerializePublish.c:164:5:MQTTSerialize_pubcomp	1

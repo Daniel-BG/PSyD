@@ -82,7 +82,7 @@ void OTA_SwapBootSlotAndReset(void)
     // BOOT_ADD0 expects the flash address divided by 16KB (shifted right by 14 bits)
     uint16_t boot_val = (uint16_t)(target_addr >> 14);
 
-    Debug_Printf("[OTA] Swapping BOOT_ADD0 to 0x%08LU (val: 0x%04X) and resetting...\r\n",
+    Debug_Printf("[OTA] Swapping BOOT_ADD0 to 0x%08X (val: 0x%04X) and resetting...\r\n",
                  target_addr, boot_val);
     Delay_ms(500);
 

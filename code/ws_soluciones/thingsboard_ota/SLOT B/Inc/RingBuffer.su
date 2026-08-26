@@ -1,6 +1,0 @@
-../Inc/RingBuffer.c:4:9:RingBuffer_Put	24	static
-../Inc/RingBuffer.c:14:10:RingBuffer_Count	24	static
-../Inc/RingBuffer.c:20:9:RingBuffer_Read	16	static
-../Inc/RingBuffer.c:27:9:RingBuffer_Peek	32	static
-../Inc/RingBuffer.c:34:6:RingBuffer_Discard	24	static
-../Inc/RingBuffer.c:40:6:RingBuffer_Flush	16	static

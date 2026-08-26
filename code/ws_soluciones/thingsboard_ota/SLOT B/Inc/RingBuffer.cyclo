@@ -1,6 +1,0 @@
-../Inc/RingBuffer.c:4:9:RingBuffer_Put	2
-../Inc/RingBuffer.c:14:10:RingBuffer_Count	2
-../Inc/RingBuffer.c:20:9:RingBuffer_Read	2
-../Inc/RingBuffer.c:27:9:RingBuffer_Peek	2
-../Inc/RingBuffer.c:34:6:RingBuffer_Discard	2
-../Inc/RingBuffer.c:40:6:RingBuffer_Flush	1
