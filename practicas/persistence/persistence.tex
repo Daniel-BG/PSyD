@@ -1,0 +1,268 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+
+\practica{Persistencia - Memoria FLASH}
+
+    \subsection{Objetivos}
+        \begin{itemize}
+            \item Entender el concepto de persistencia y para qué datos sirve.
+            \item Entender el funcionamiento de la memoria \PER{FLASH}.
+        \end{itemize}
+
+    \subsection{Fundamentos teóricos}
+       
+        Todos damos por sentado que, en un ordenador al uso, podemos guardar datos que se mantendrán tras el reinicio. Sin embargo, en los dispositivos empotrados, muchas veces no ocurre lo mismo: Los programas se ejecutan en RAM y, al terminar, toda su información se ha borrado. Si, por ejemplo, queremos tener cierta configuración de usuario (como pueda ser la temperatura en un termostato, por ejemplo) hay que asegurarse de alguna manera que se mantiene.
+
+        Una forma de hacerlo es mediante memoria persistente \PER{FLASH}. Este tipo de memoria tiene una peculiaridad, y es que, si bien consigue guardar datos incluso sin corriente, al contrario que la RAM, se desgasta con el uso. Adicionalmente, sólo se pueden escribir ``0'' y borrar a ``1'' (lo que se conoce como un ciclo de escritura-borrado). Por tanto, cada vez que la queremos reprogramar, desgastamos su estructura. El procesador \MCU tiene una garantía mínima de un aguante de 10000 ciclos de este proceso. Aún así, se recomienda encarecidamente limitar estos números lo máximo posible. Para esta práctica, en concreto, intenta limitar el número de borrados de la \PER{FLASH}. Si tienes cualquier duda, consulta a tu profesor.
+
+        En cuanto a las lecturas, no supone ningún problema, y de hecho nuestro programa se guarda en la \PER{FLASH}, para que se ejecute desde ahí las veces que sea necesario, y sus valores volátiles en la \PER{RAM}, evitando así ese desgaste continuo.
+
+        \subsubsection{Organización de la flash}
+
+            En nuestro procesador, la memoria \PER{FLASH} se organiza en \emph{sectores} (\REFMAN[3.3.1]). Podemos escribir byte a byte en cada sector, sin embargo para resetearlo, deberemos resetear los sectores enteros. Este diseño hace que se desgaste menos la memoria, al caber generalmente un programa en únicamente unos pocos sectores, y no necesitar borrar el resto. Es lo mismo que ocurre con los discos SSD, que pueden ir repartiendo el desgaste entre sus sectores para durar más.
+
+    \subsection{Desarrollo de la práctica}
+
+        \subsubsection{Bucle de control principal}
+
+            En esta práctica vamos a hacer que la última coordenada pulsada en la pantalla táctil se guarde de manera persistente, de tal manera que, tras reiniciar (o incluso desconectar de la corriente) nuestro procesador, la podamos volver a ver tras un nuevo arranque. Condicionaremos el guardado con el pusado de un botón, para evitar que se desgaste en exceso. El esquema general es el siguiente:
+
+            \begin{lstlisting}
+                int main(void)
+                {
+                    // Inicializaciones
+
+                    if (UserButton_IsPressed()) {
+                        // Borrar memoria persistente
+                    }
+
+                    // Attempt reading saved coordinates
+                    if (Flash_ReadTouch(&last_x, &last_y)) {
+                        // Si se encuentran datos en la memoria, cargarlos
+                        // dibujando un cuadrado verde en la posición guardada
+                    } else {
+                        // Si no se encuentran datos, dibujar un cuadrado amarillo
+                    }
+
+                    while (1) {
+                        // Lógica de actualización de la pantalla
+                        // Save new touch coordinates into Flash
+                        if (UserButton_IsPressed()) {
+                            // Guardar coordenada en memoria persistente
+                        }
+                    }
+                }
+            \end{lstlisting}
+
+        \subsubsection{Trabajando con la FLASH}
+
+            En primer lugar, necesitamos completar nuestro \texttt{bsp.h} con el código necesario para exponer los registros de la \PER{FLASH} (\REFMAN[3]).
+
+            \begin{lstlisting}
+                #define FLASH_BASE_ADDR 	 0x40023C00UL
+
+                typedef struct {
+                    volatile uint32_t ACR;      // 0x00
+                    volatile uint32_t KEYR;     // 0x04
+                    volatile uint32_t OPTKEYR;  // 0x08
+                    volatile uint32_t SR;       // 0x0C
+                    volatile uint32_t CR;       // 0x10
+                    volatile uint32_t OPTCR;    // 0x14
+                    volatile uint32_t OPTCR1;   // 0x18
+                    volatile uint32_t OPTCR2;   // 0x1C
+                } FLASH_TypeDef;
+
+                #define FLASH             	((FLASH_TypeDef *) FLASH_BASE_ADDR)
+            \end{lstlisting}
+
+            Utilizar la \PER{FLASH} no es tan fácil como escribir directamente en sus registros. Ya hemos mencionado en un par de ocasiones que la memoria se desgasta. No es de extrañar, por tanto, que haya un cierto nivel de protección para trabajar con  ella. Aunque es accesible directamente para lectura  (podemos leer desde la dirección \MEMORY{0x08000000} en adelante, y estaremos leyendo desde la \PER{FLASH} (\REFMAN[1.6.2])), la escritura está protegida. Adicionalmente a evitar el desgaste, evitamos escribir accidentalmente en una región que suele contener únicamente código y constantes (Ver el archivo de linkado \texttt{STM32F723IEKX\_FLASH.ld} para comprobarlo).
+
+            La \PER{FLASH} está siempre activa, así que nos ahorraremos activar periféricos o relojes. Pero lo primero, antes de trabajar con ella, si queremos realizar algún cambio, es desbloquear el acceso que previene escrituras accidentales. Para ello hay que escribir una secuencia específica de datos en el registro \REG{KEYR} (\REFMAN[3.7.2]) tras comprobar que no esté bloqueda. Si por el contrario queremos bloquearla, esto se hace de manera más sencilla configurando el bit correspondiente en \REG{CR} (\REFMAN[3.7.5])
+
+            \begin{lstlisting}
+                /* Flash Keys */
+                #define FLASH_KEY1        0x45670123U
+                #define FLASH_KEY2        0xCDEF89ABU
+                static void inline Flash_Unlock(void) {
+                    // ... completar aplicar secuencia de desbloqueo en KEYR
+                }
+
+                static void inline Flash_Lock(void) {
+                    // ... completar bloquear en registro CR
+                }
+            \end{lstlisting}
+
+            Ciertas operaciones con la \PER{FLASH} requerirán esperar a que el periférico deje de estar ocupado (no deja de ser una interfaz con la memoria, que no necesariamente opera a la misma velocidad que el procesador). Incluimos también la función que realiza una espera activa a que se libere el bit correspondiente en \REG{SR}: (\REFMAN[3.7.4]).
+            
+            \begin{lstlisting}
+                static void inline Flash_WaitNotBusy(void) {
+                    while (FLASH->SR & (1U << 16)); // Wait for BSY bit
+                }
+            \end{lstlisting}
+
+            Con estas funciones estamos listos para, en primer lugar, borrar un sector. Recordemos que es necesario borrar (poner todo a ``1'') antes de poder escribir (que grabará sólo los ``0'' correspondientes). Esto es debido a que la tecnología subyacente sólo permite este tipo de trabajo. Programamos la función de borrado desde el registro \REG{CR} (\REFMAN[3.7.5]). Hay previamente que solicitar el desbloqueo de flash, y con posterioridad bloquearla para evitar escrituras accidentales.
+
+            \begin{lstlisting}
+                static void inline Flash_EraseSector(uint8_t sector) {
+                    Flash_Unlock();
+                    Flash_WaitNotBusy();
+
+                    // ... completar borrar los bits de sector SNB
+                    // ... completar programar el sector que queremos borrar
+                    // ... completar marcar el bit de borrado SER
+                    // ... completar iniciar el borrado con el bit STRT
+
+                    Flash_WaitNotBusy();
+                    // ... completar desactivar el borrado SER
+                    Flash_Lock();
+                }
+            \end{lstlisting}
+
+            \textbf{NOTA:} Ten cuidado con los sectores que borras, ya que en los primeros (0-3) se suele guardar el código del programa. Si lo borras, lo más seguro es que la aplicación se bloquee, ten en cuenta la estructura de sectores de la \Cref{fig:pers_flash_sectors}.
+
+            \begin{figure}
+                \centering
+                \begin{tikzpicture}[node distance=0cm, outer sep=0pt, font=\sffamily\small]
+                    % Sector blocks
+                    \node [draw, fill=red!15, minimum width=7cm, minimum height=1.2cm, align=center] (sec0) 
+                        {\textbf{Sectors 0--3} (16--64 KB)\\Código de Aplicación};
+                    \node [draw, fill=gray!15, minimum width=7cm, minimum height=1.2cm, align=center, below=0cm of sec0] (sec4) 
+                        {\textbf{Sectors 4--6} (128 KB each)\\Sectores Libres};
+                    \node [draw, fill=green!20, minimum width=7cm, minimum height=1.2cm, align=center, below=0cm of sec4] (sec7) 
+                        {\textbf{Sector 7} (128 KB)\\Datos (\texttt{FLASH\_STORAGE\_ADDR})};
+
+                    % Base addresses on the left
+                    \node [left=0.3cm of sec0.north west, anchor=north east, font=\ttfamily\footnotesize] {0x0800 0000};
+                    \node [left=0.3cm of sec4.north west, anchor=north east, font=\ttfamily\footnotesize] {0x0801 0000};
+                    \node [left=0.3cm of sec7.north west, anchor=north east, font=\ttfamily\footnotesize] {0x0806 0000};
+                    \node [left=0.3cm of sec7.south west, anchor=south east, font=\ttfamily\footnotesize] {0x0807 FFFF};
+
+                    % Safe boundary annotation on the right
+                    \draw[thick, stroke=red, <-] (sec0.north east) -- ++(0.5,0) node[right, font=\footnotesize\color{red}] {Crítico (No borrar!)};
+                    \draw[thick, stroke=green!50!black, <-] (sec7.north east) -- ++(0.5,0) node[right, font=\footnotesize\color{green!50!black}] {Seguro para persistencia};
+                \end{tikzpicture}
+                \caption{Organización de los sectores de Flash}
+                \label{fig:pers_flash_sectors}
+            \end{figure}
+
+            Ahora, si queremos escribir, el proceso será ligeramente distinto. Por el momento, ya que no vamos a escribir demasiada información, vamos a ir byte a byte, pero la función se puede adaptar para escribir posteriormente en bloques, sin necesidad de bloquear y desbloquear con cada transferencia de información. De nuevo trabajamos con el registro \REG{CR} para, en este caso, habilitar la escritura. Observemos también la secuencia para escribir: lo vamos a hacer directamente escribiendo en la dirección de memoria requerida (de la misma forma que lo hacíamos en las prácticas iniciales). El controlador de la \PER{FLASH} recibirá el dato y, tras ello, lo escribirá. Como puede tardar varios ciclos, forzamos mediante primitivas el vaciado de los \emph{store buffers}, y hacemos una espera a que el periférico nos confirme que ha terminado:
+
+            \begin{lstlisting}
+                static void inline  Flash_WriteByte(uint32_t address, uint8_t data) {
+                    Flash_Unlock();
+
+                    // ... completar Ajustar el tamaño de transferencia PSIZE a '00'
+                    // ... habilitar la programación de FLASH con el bit PG a 1
+
+                    *(volatile uint8_t *)address = data;
+                    __asm volatile ("dsb 0xF" ::: "memory"); // Pipeline flush
+                    Flash_WaitNotBusy();         // Wait for BSY bit to clear
+
+                    // ... deshabilitar la programación de FLASH con el bit PG a 0
+
+
+                    Flash_Lock();
+                }
+            \end{lstlisting}
+
+            De la lectura no hay que preocuparse, pues podremos hacer lecturas directas a las direcciones de memoria atacadas.
+           
+        \subsubsection{Creando las estructuras para la persistencia}
+            Con esto ya tenemos la \PER{FLASH} preparada para trabajar con ella con todas las funciones auxiliares. Ahora, lo que nos falta es crear un nuevo conjunto de funciones que nos permitan escribir una estructura de datos (que queramos en este caso guardar) utilizándolas. Creamos un nuevo archivo (por ejempo \texttt{persistence.h}) con el siguiente contenido:
+
+            \begin{lstlisting}
+                /*
+                * persistence.h
+                *
+                *  Created on: Aug 27, 2026
+                *      Author: dani
+                */
+
+                #ifndef PERSISTENCE_H_
+                #define PERSISTENCE_H_
+
+                #define FLASH_SECTOR_NUM    7U                  // Sector 7 (safe upper Flash sector)
+                #define FLASH_STORAGE_ADDR  0x08060000U         // Base address of Sector 7
+                #define FLASH_MAGIC_KEY     0xCAFEBABEU         // Marker to verify stored data validity
+
+                typedef struct {
+                    uint32_t magic;
+                    uint16_t x;
+                    uint16_t y;
+                } FlashTouchData;
+
+                /* Erases Sector 7 and writes the magic key + touch coordinates */
+                void Flash_SaveTouch(uint16_t x, uint16_t y) {
+                    FlashTouchData data = {
+                        .magic = FLASH_MAGIC_KEY,
+                        .x = x,
+                        .y = y
+                    };
+
+                    Flash_EraseSector(FLASH_SECTOR_NUM);
+
+                    uint8_t *pData = (uint8_t *)&data;
+                    for (uint32_t i = 0; i < sizeof(FlashTouchData); i++) {
+                        Flash_WriteByte(FLASH_STORAGE_ADDR + i, pData[i]);
+                    }
+                }
+                #endif /* PERSISTENCE_H_ */
+            \end{lstlisting}
+
+            \begin{figure}
+                \centering
+                \begin{tikzpicture}[font=\sffamily\small]
+                    % Struct Memory Blocks
+                    \node[draw, fill=blue!15, minimum height=1.2cm, minimum width=3.2cm, align=center] (magic) 
+                        {\texttt{magic}\\(4 Bytes)};
+                    \node[draw, fill=orange!20, minimum height=1.2cm, minimum width=1.6cm, align=center, right=0cm of magic] (x) 
+                        {\texttt{x}\\(2 Bytes)};
+                    \node[draw, fill=green!20, minimum height=1.2cm, minimum width=1.6cm, align=center, right=0cm of x] (y) 
+                        {\texttt{y}\\(2 Bytes)};
+
+                    % Offset labels below
+                    \node[below=0.1cm of magic.south west, font=\ttfamily\tiny, anchor=north west] {Offset +0x00};
+                    \node[below=0.1cm of x.south west, font=\ttfamily\tiny, anchor=north west] {+0x04};
+                    \node[below=0.1cm of y.south west, font=\ttfamily\tiny, anchor=north west] {+0x06};
+                    \node[below=0.1cm of y.south east, font=\ttfamily\tiny, anchor=north east] {+0x08};
+
+                    % Example Data Values above
+                    \node[above=0.1cm of magic, font=\ttfamily\footnotesize, color=blue!60!black] {0xCAFEBABE};
+                    \node[above=0.1cm of x, font=\ttfamily\footnotesize, color=orange!80!black] {X Touch};
+                    \node[above=0.1cm of y, font=\ttfamily\footnotesize, color=green!40!black] {Y Touch};
+                \end{tikzpicture}
+                \caption{Organización de la estructura de guardado en memoria}
+                \label{fig:pers_structure_org}
+            \end{figure}
+
+            Hay que fijarse en un detalle interesante: Aunque queremos guardar un conjunto de coordenadas (x, y), nuestra estructura (\Cref{fig:pers_structure_org}) contiene un tercer campo llamado \emph{magic} con un valor fijo. El guardar un valor como este es muy importante para poder saber si disponemos de valores válidos en las direcciones de memoria que consultemos. De lo contrario, estaríamos cargando valores aleatorios almacenados previamente por otros programas o usuarios. Programa ahora la función simétrica para realizar la lectura:
+
+            \begin{lstlisting}
+                /* Reads coordinates from Flash if a valid magic key is present */
+                uint8_t Flash_ReadTouch(uint16_t *x, uint16_t *y) {
+                    // ... completar conseguir un puntero de tipo FlashTouchData
+                    // ... a la dirección base para poder leerla
+                    
+                    // ... si encontramos la MAGIC KEY, devolver 1
+                    // ... además de rellenar los valores x, y
+                    // ... de lo contrario, devolver 0 (Flash vacía)
+                }
+            \end{lstlisting}
+    
+            Y... casi listo! Sólo nos falta completar el código de \texttt{main.c} anteriormente presentado, llamando ahora sí a estas funciones auxiliares que hemos creado para guardar y leer la \PER{FLASH}. Comprueba que, tras guardar un punto, e incluso desconectando la placa de la corriente, se lee el dato guardado en memoria.
+
+    \subsection{Para hacer más}
+
+        Existe otra forma de persistencia en memoria mediante la \PER{BKPSRAM} o memoria de \emph{backup}. Es una zona de memoria que mantiene sus contenidos incluso tras resetear el procesador (eso sí, si se pierde la corriente, se borrarán igualmente). No es tan persistente como la \PER{FLASH}, pero no sufre de desgaste. Investiga cómo podrías hacer la persistencia con esta memoria (\REFMAN[4.1.3]). 
+        
+        \textbf{CURIOSIDAD:} Los antiguos juegos de videoconsolas como la \emph{Game Boy} funcionaban con este tipo de memoria. Los cartuchos incluían una pila para mantener las partidas guardadas. Si se acababa la pila, se perdían los datos. Duraban unos cuantos años, pero debido a esa tecnología se han perdido muchos recuerdos.
+
+
+
+
+
+
+
+\end{document}

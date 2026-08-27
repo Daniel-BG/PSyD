@@ -48,6 +48,7 @@ int main(void)
 		delay(1000000);
 		GPIO_PIN_WRITE(GPIOA, 7, GPIO_STATE_ZERO);
 		delay(1000000);
+		Debug_Printf("XYZ");
 	}
 }
 

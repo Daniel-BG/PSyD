@@ -287,10 +287,7 @@
             }
         \end{lstlisting}
     
-
-
-    
     \subsection{Para hacer más}
-        Hay un ``temporizador'' especial llamado \PER{RTC} (\emph{Real Time Clock}) capaz de llevar la cuenta de la hora y fecha actual de forma precisa. Con ello, además, puede generar interrupciones a largo plazo. Se utiliza principalmente para realizar esperas largas donde el procesador está dormido mientras espera la interrupción. Consulta la documentación y utilízalo para hacer parpadear el led azul (PA5) cada 5 segundos.
+        Aunque hay varios temporizadores (14 en concreto en el caso de \MCU (\REFMAN[18,19,20])) para sistemas complejos con necesidad de medir una multitud de intervalos, pueden quedarse cortos. Para solventar este problema, cada temporizador es capaz de generar interrupciones en varios modos diferentes y con varios contadores distintos. Como todas estas interrupciones comparten ciertos aspectos de configuración, no podrá haber demasiada diferencia entre los tiempos que midan, aún así da mucha versatilidad. Investiga cómo puedes hacer que haya varias interrupciones diferentes desde un mismo temporizador (\REFMAN[19]). (\textbf{NOTA:}) las interrupciones vendrán por la misma línea, y habrá que averiguar, programáticamente, qué parte del temporizador las causó (\REFMAN[19.4.4,19.4.5]).
 
 \end{document}

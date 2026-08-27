@@ -1,0 +1,104 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+
+\practica{Medida del tiempo de programa}
+
+    \subsection{Objetivos}
+        \begin{itemize}
+            \item Entender la importancia de tener un \emph{ticker} en el sistema, que provea de una referencia consistente del tiempo.
+            \item Utilizar el \emph{ticker} tanto para esperas como para medidas de tiempo entre eventos.
+        \end{itemize}
+
+    \subsection{Fundamentos teóricos}
+        
+        Los \emph{timers} son una herramienta extremadamente útil para tomar medidas de tiempo. Sin embargo, ofrecen únicamente una medida \emph{local} del tiempo. Es decir, si se dispara un timer sabemos que fue hace un tiempo dado concreto, pero no tenemos más referencia temporal. Cuando se quiere saber el tiempo que pasa entre eventos, lo habitual es usar un \emph{ticker} dentro del sistema que, desde un origen predifinido, va incrementado sistemáticamente un contador cada cierto tiempo dado. Así, mirando el valor del \emph{ticker}, sabremos cuánto tiempo ha pasado desde cualquier otra referencia temporal, con solo calcular la diferencia entre ambos valores.
+
+        Hasta ahora, hemos tenido en ocasiones la necesidad de contar tiempo, y para ello hemos utilizado una función similar a esta:
+
+        \begin{lstlisting}
+            void delay(int loops) {
+                for (int i = 0; i < loops; i++) {
+                    __asm("nop");
+                }
+            }
+        \end{lstlisting}
+
+        Básicamente introducimos un retardo con un bucle que da un cierto número de ciclos antes de terminar. El problema con esta aproximación es doble: por un lado, no sabemos cuánto tarda exactamente una vuelta del bucle (depende, en cierta medida, del número de instrucciones que genere el compilador). Por otro, aunque supiéramos el número de instrucciones, el tiempo que tarda dependerá de la frecuencia del reloj, aciertos en caché... En resumen, no es preciso.
+
+    \subsection{Desarrollo de la práctica}
+
+        En esta práctica vamos a utilizar el periférico \PER{SYSTICK} del sistema (\PMMAN[4.4]), que nos permite precisamente contar el número de eventos o \emph{ticks} que han ocurrido desde el reseteo del procesador. El tiempo de un \emph{tick} será configurado por nosotros.
+
+        El primer paso es definir el periférico junto a su dirección mapeada en memoria:
+
+        \begin{lstlisting}
+            #define SYSTICK_BASE_ADDR  		(0xE000E010UL)
+
+            typedef struct {
+                volatile uint32_t CTRL;     // 0x00
+                volatile uint32_t LOAD;     // 0x04
+                volatile uint32_t VAL;      // 0x08
+                volatile uint32_t CALIB;    // 0x0C
+            } SysTick_TypeDef;
+
+            #define SYSTICK           	((SysTick_TypeDef *) SYSTICK_BASE_ADDR)
+        \end{lstlisting}
+
+        A continuación debemos crear dos funciones para desactivar y activar el \PER{SYSTICK}. Para ello da el valor adecuado a cada registro. En \REG{LOAD}, ten en cuenta que tendrás que configurar cada cuánto tiempo quieres que se cuente un \emph{tick}. Lo normal es que los \emph{ticks} sean de 1ms. El reloj base es de 16MHz, así que calcula su valor en base a ello. En \REG{VAL} configurarás el valor inicial de \emph{tick}. Finalmente en \REG{CTRL} deberás activar las interrupciones y el periférico, así como establecer la fuente de reloj al oscilador del procesador.
+
+        \begin{lstlisting}
+            static void inline SysTick_Init(void) {
+                // Default HSI clock is 16MHz on reset. 1ms tick = 16,000 cycles.
+                // ... completar dar los valores adecuados a cada registro.
+                SysTick->LOAD = 
+                SysTick->VAL  = 
+                SysTick->CTRL = 
+            }
+
+            static void inline SysTick_Disable(void) {
+                SysTick->LOAD = 0U;
+                SysTick->VAL  = 0U;
+                SysTick->CTRL = 0U;
+            }
+        \end{lstlisting}
+
+        Ahora que tenemos nuestro \emph{ticker} configurado, falta saber en qué \emph{tick} estamos. Para ello, tenemos que declarar una variable que poder consultar. 
+
+        \begin{lstlisting}
+            volatile uint32_t msTicks;
+
+            static uint32_t inline GetTick(void) {
+                return msTicks;
+            }
+        \end{lstlisting}
+
+        ¿Y... cómo enlazamos esta variable con el \emph{ticker}? Previamente, hemos activado en \REG{CTRL} de \PER{SYSTICK} las interrupciones. Basta con capturar la interrupción del \PER{SYSTICK} y actualizar nuestra variable de conteo:
+
+        \begin{lstlisting}
+            void SysTick_Handler(void) {
+                msTicks++;
+            }
+        \end{lstlisting}
+
+        Como sabemos que se dispara cada milisegundo, sabemos también que la cuenta de \texttt{msTicks} tendrá el valor, en milisegundos, desde que inicializamos \PER{SYSTICK}.
+
+        Y ahora sí, estamos listos para sustituir a nuestra función de espera \texttt{delay}. Para ello, primero capturaremos el \emph{tick} actual, y simplemente esperaremos a que se cumpla el tiempo aportado:
+
+        \begin{lstlisting}
+            static void inline  Delay_ms(uint32_t ms) {
+                uint32_t start = GetTick();
+                while ((GetTick() - start) < ms);
+            }
+        \end{lstlisting}
+
+        Como la variable \texttt{msTicks} es un entero de 32 bits, tenemos suficiente margen como para contar unos $\approx50$ días. En ese momento, la cuenta volverá a cero. No es un problema en cualquier caso para diferencias relativas de tiempo, donde, aunque hayamos hecho \emph{overflow}, la resta de dos tiempos siempre estará en ese rango de $\approx50$ días.
+        
+        Con este contador de tiempo preparado, prepara ahora un código donde seas capaz de detectar si hay \emph{dobles clicks} en un botón, tomando las referencias temporales con \texttt{GetTick()} cada vez que se pulse, y comprobando que dos consecutivas estén por debajo de los, por ejemplo, 500ms. Recuerda llamar a \texttt{Systick\_Init()} desde tu código main. No es necesario que actives interrupciones en \PER{NVIC} pues ya están por defecto activadas.
+
+    
+    \subsection{Para hacer más}
+        Hay un ``temporizador'' especial llamado \PER{RTC} (\emph{Real Time Clock}) capaz de llevar la cuenta de la hora y fecha actual de forma precisa. Con ello, además, puede generar interrupciones a largo plazo. Se utiliza principalmente para realizar esperas largas donde el procesador está dormido (potencialmente durante horas o días) mientras espera la interrupción. Consulta la documentación (\REFMAN[25]) y utilízalo para hacer parpadear el led azul (PA5) cada 5 segundos.
+
+\end{document}
