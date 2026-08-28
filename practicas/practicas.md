@@ -67,6 +67,12 @@ No todas las zonas de memoria del procesador mantienen la información tras un r
 
 ---
 
+## [Práctica 10](cooperative_multitasking/cooperative_multitasking.pdf) - Planificadores - Cooperativo
+
+## [Práctica 11](preemtive_multitasking/preemptive_multitasking.pdf) - Planificadores - Expropiativo
+
+---
+
 ## [Práctica 10](thingsboard_data_control/thingsboard_data_control.pdf) - Comunicación remota con ThingsBoard
 
 Aunque numerosos sistemas empotrados viven sus días aislados del mundo exterior (internet), muchos otros requieren de comunicación constante. Existen infinidad de plataformas de control, así como protocolos, que nos permiten precisamente esto. Podemos tanto recibir información, como mandar comandos de control desde y hacia nuestros dispositivos. En esta práctica vemos un ejemplo utilizando MQTT y Thingsboard.

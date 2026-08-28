@@ -1,0 +1,483 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+
+\practica{Multitarea Cooperativa}
+
+    \subsection{Objetivos}
+        \begin{itemize}
+            \item Entender la importancia de la multitarea en sistemas empotrados y de tiempo real.
+            \item Desarrollar un modelo cooperativo para la ejecución de diferentes tareas.
+        \end{itemize}
+
+    \subsection{Fundamentos teóricos}
+
+        Conforme aumenta la complejidad de un sistema, se hace necesaria la ejecución de varias tareas diferentes. Hasta ahora, nuestra solución ha sido tener un gran bucle principal que va ejecutando todo lo necesario. Si son múltiples acciones las que se deben llevar a cabo, se habrá programado una lógica que las vaya haciendo una tras otra en algún orden. Sin embargo, cuando aumenta la complejidad del sistema, esta aproximación acaba resultando inviable. En su lugar, se favorece el desarrolar algún tipo de \emph{framework} que nos permita crear \emph{tareas}, y las ejecute automáticamente cada cierto tiempo.
+
+        Especialmente en sistemas empotrados, esta temporalidad es muy importante (y en ocasiones crítica):
+
+        \begin{itemize}
+            \item Un generador que debe asegurar una frecuencia exacta de 50Hz.
+            \item Un controlador de vuelo que debe muestrear una unidad de medición inercial a 400Hz.
+            \item Un sistema de airbag que debe comprobar la velocidad y dispararse en menos de 1ms.
+        \end{itemize}
+
+        Para dar servicio a todos estos sistemas, y cualquier otro, se crean \emph{planificadores}. Los planificadores no son algo que tenga dentro de sí el procesador (como podían ser los periféricos), sino que son responsabilidad del programador, que los programa aprovechando las capacidades del procesador. La principal característica que se explota para ello es la capacidad de temporización del procesador, ya sea a través de los \PER{TIM} \REFMAN[18,19,20], a través del \PER{RTC} \REFMAN[25], o a través (y lo más común) del \emph{ticker} del sistema \PER{SYSTICK} \PMMAN[4.4]. 
+
+        Con estos, se introducen interrupciones periódicas que paran las tareas en curso, y dan paso a que un planificador pueda organizar las sigiuentes tareas a ejecutar. 
+
+        \subsection{Desarrollo de la práctica}
+
+            Lo primero es entender qué perseguimos, y podemos verlo en la \Cref{fig:scheduled_tasks}. Tener unas tareas (por ejemplo 1, 2 y 3) que se ejecuten, respectivamente, en intervalos diferentes (250, 500 y 1000ms). Para medir el tiempo, utilizaremos el \PER{SYSTICK}, configurado precisamente para que avise cada milisegundo. Por supuesto, si se quiere una granularidad diferente de tiempos, se puede configurar con otros intervalos diferentes.
+
+            \begin{figure}[htbp]
+                \centering
+                \begin{tikzpicture}[
+                    font=\sffamily\small,
+                    >=Stealth,
+                    lane label/.style={font=\sffamily\bfseries\footnotesize, align=right, anchor=east},
+                    block/.style={draw, rounded corners=1pt, minimum height=0.4cm, inner sep=0pt}
+                ]
+
+                    % --- ESTILOS DE BLOQUES Y LEYENDA ---
+                    \tikzset{
+                        task1/.style={fill=cyan!60, draw=cyan!80!black},
+                        task2/.style={fill=green!50!black, fill=green!50, draw=green!80!black},
+                        task3/.style={fill=red!60, draw=red!80!black},
+                        cpuactive/.style={fill=yellow!40, draw=yellow!70!black},
+                        cpusleep/.style={fill=gray!25, draw=gray!40}
+                    }
+
+                    % --- LEYENDA ---
+                    \begin{scope}[shift={(0, 3.6)}]
+                        \node[font=\sffamily\bfseries\small, anchor=west] at (-0.5, 0.3) {Leyenda:};
+
+                        \node[block, task1, minimum width=0.35cm] (l1) at (1.5, 0.3) {};
+                        \node[right=0.08cm of l1, font=\sffamily\tiny] {Task 1 (250ms)};
+
+                        \node[block, task2, minimum width=0.35cm] (l2) at (3.8, 0.3) {};
+                        \node[right=0.08cm of l2, font=\sffamily\tiny] {Task 2 (500ms)};
+
+                        \node[block, task3, minimum width=0.35cm] (l3) at (6.1, 0.3) {};
+                        \node[right=0.08cm of l3, font=\sffamily\tiny] {Task 3 (1000ms)};
+
+                        \node[block, cpuactive, minimum width=0.35cm] (l4) at (8.4, 0.3) {};
+                        \node[right=0.08cm of l4, font=\sffamily\tiny] {CPU Activa};
+
+                        \node[block, cpusleep, minimum width=0.35cm] (l5) at (10.3, 0.3) {};
+                        \node[right=0.08cm of l5, font=\sffamily\tiny] {CPU Sleep (\texttt{wfi})};
+                    \end{scope}
+
+                    % --- CARRILES HORIZONTALES ---
+                    \node[lane label] at (-0.2, 2.7) {Task 1 (250ms)};
+                    \node[lane label] at (-0.2, 1.9) {Task 2 (500ms)};
+                    \node[lane label] at (-0.2, 1.1) {Task 3 (1000ms)};
+                    \node[lane label] at (-0.2, 0.3) {Estado CPU};
+
+                    % Fondo de carriles de tareas
+                    \foreach \y in {2.7, 1.9, 1.1} {
+                        \draw[gray!15, line width=0.35cm] (0, \y) -- (12.2, \y);
+                    }
+                    
+                    % Carril base de la CPU (Fondo general en modo Reposo)
+                    \node[block, cpusleep, anchor=west, minimum width=12.2cm] at (0, 0.3) {};
+
+                    % Eje de tiempo y marcas principales (Escala: 1000ms = 3cm)
+                    \draw[->, thick] (0, -0.2) -- (12.6, -0.2) node[right, font=\sffamily\small] {Tiempo};
+
+                    \foreach \x/\t in {0/0, 1.5/500, 3.0/1000, 4.5/1500, 6.0/2000, 7.5/2500, 9.0/3000, 10.5/3500, 12.0/4000} {
+                        \draw[gray!35, dashed] (\x, -0.2) -- (\x, 3.0);
+                        \draw[thick] (\x, -0.25) -- (\x, -0.15);
+                        \node[below, font=\sffamily\tiny] at (\x, -0.25) {\t\,ms};
+                    }
+
+                    % Marcas secundarias cada 250ms
+                    \foreach \x in {0.75, 2.25, 3.75, 5.25, 6.75, 8.25, 9.75, 11.25} {
+                        \draw[gray!20, dotted] (\x, -0.2) -- (\x, 3.0);
+                    }
+
+                    % --- GENERACIÓN AUTOMÁTICA DE BLOQUES (0 a 4000 ms) ---
+                    \foreach \k in {1,...,16} {
+                        \pgfmathsetmacro{\xbase}{\k * 0.75}
+
+                        % 1. Task 1 (Cada 250ms)
+                        \node[block, task1, anchor=west, minimum width=0.12cm] at (\xbase, 2.7) {};
+                        
+                        \pgfmathsetmacro{\cpuwidth}{0.12}
+                        \pgfmathsetmacro{\xoffset}{\xbase + 0.12}
+
+                        % 2. Task 2 (Cada 500ms -> k par)
+                        \pgfmathtruncatemacro{\remTwo}{mod(\k, 2)}
+                        \ifnum\remTwo=0
+                            \node[block, task2, anchor=west, minimum width=0.12cm] at (\xoffset, 1.9) {};
+                            \pgfmathsetmacro{\cpuwidth}{\cpuwidth + 0.12}
+                            \pgfmathsetmacro{\xoffset}{\xoffset + 0.12}
+                        \fi
+
+                        % 3. Task 3 (Cada 1000ms -> k múltiplo de 4)
+                        \pgfmathtruncatemacro{\remFour}{mod(\k, 4)}
+                        \ifnum\remFour=0
+                            \node[block, task3, anchor=west, minimum width=0.12cm] at (\xoffset, 1.1) {};
+                            \pgfmathsetmacro{\cpuwidth}{\cpuwidth + 0.12}
+                        \fi
+
+                        % 4. Bloque de Ocupación Real de CPU (calculado solo con la duración de las tareas)
+                        \node[block, cpuactive, anchor=west, minimum width=\cpuwidth cm] at (\xbase, 0.3) {};
+                    }
+
+                \end{tikzpicture}
+                \caption{Diagrama de planificación de tareas.}
+                \label{fig:scheduled_tasks}
+            \end{figure}
+
+            Como vemos, queda cierto tiempo libre entre la ejecución de tareas. Una cuestión importante de indicar es que, por mucho que consideremos este tipo de sistemas para ``tiempo real'', tenemos que asegurar siempre que las tareas tardan menos en ejecutarse, del tiempo disponible para la ejecución. De lo contrario, y aunque quizá sea obvio, no dará tiempo a completar todas. Generalmente, se planifican de esta forma tareas muy críticas, condenando tareas no críticas a poder potencialmente perder ``turnos''. No es el objetivo en cualquier caso de esta práctica, ya que nuestras tareas serán muy sencillas, pero hay que tenerlo en cuenta.
+
+            Nuestras tareas simplemente parpadearán los 3 LEDs disponibles en la placa (El LED rojo en \texttt{PA7}, el azul el \texttt{PA5}, y el verde en \texttt{PB1}, recuerda que deberás inicializar los \PER{GPIO} correspondientes).
+
+            Nuestro código será extremadamente simple (al menos el principal, el resto quizá sea debatible). La estructura es la siguiente:
+
+            \begin{lstlisting}
+                void SysTick_UserCallback() {
+                    scheduler();
+                }
+
+                int main(void) {
+                    SysTick_Init();
+                    GPIO_Init();
+                    scheduler_init();
+
+                    create_task(Task_BlinkBlue, 250);
+                    create_task(Task_BlinkGreen, 500);
+                    create_task(Task_BlinkRed, 1000);
+
+                    // Scheduler
+                    while (1) {
+                        // Low-power sleep: Wait for the next SysTick interrupt before executing the scheduler loop again
+                        __asm volatile ("wfi");
+                        dispacher();
+                    }
+
+                    return 0;
+                }
+            \end{lstlisting}
+
+            Disponemos de una función \texttt{SysTick\_UserCallback} que se llamará automáticamente en cada \emph{tick} del \PER{SYSTICK}, y organizará las tareas a ejecutar. Por otro lado, una función \texttt{main} que creará las tareas, y ejecutará el \emph{despachador} para irlas ejecutando según estén listas. El diagrama general de ejecución se puede ver en la \Cref{fig:general_execution_diagram}.
+
+            \begin{figure}[htbp]
+                \centering
+                \begin{tikzpicture}[
+                    font=\sffamily\small,
+                    >=Stealth,
+                    node distance=1.0cm and 1.2cm,
+                    isrblock/.style={draw, rectangle, rounded corners=3pt, fill=purple!15, draw=purple!80!black, thick, align=center, inner sep=6pt},
+                    mainblock/.style={draw, rectangle, rounded corners=3pt, fill=orange!15, draw=orange!80!black, thick, align=center, inner sep=6pt},
+                    taskblock/.style={draw, rectangle, rounded corners=3pt, fill=cyan!15, draw=cyan!80!black, thick, align=center, inner sep=6pt},
+                    datablock/.style={draw, ellipse, fill=yellow!20, draw=yellow!80!black, thick, align=center, inner sep=5pt, font=\sffamily\footnotesize},
+                    hwblock/.style={draw, rectangle, fill=red!15, draw=red!80!black, thick, align=center, inner sep=6pt},
+                    arrow/.style={->, thick, >=Stealth},
+                    dataarrow/.style={->, thick, dashed, >=Stealth, color=gray!80!black}
+                ]
+
+                    % --- NODOS CONTEXTO ISR (SUPERIOR) ---
+                    \node[hwblock] (hw) {Timer Hardware\\(SysTick)};
+                    \node[isrblock, right=1.0cm of hw] (systick_h) {\texttt{SysTick\_Handler()}\\(Rutina ISR)};
+                    \node[isrblock, right=1.0cm of systick_h] (callback) {\texttt{SysTick\_UserCallback()}};
+                    \node[isrblock, right=1.0cm of callback] (sched) {\texttt{scheduler()}};
+
+                    % --- ESTRUCTURA DE DATOS COMPARTIDA (CENTRO) ---
+                    \node[datablock, below=1.6cm of callback] (data) {Tabla de Tareas};
+
+                    % --- NODOS CONTEXTO HILO PRINCIPAL (INFERIOR) ---
+                    \node[mainblock, left=2cm of data] (disp) {\texttt{dispatcher()}};
+                    \node[mainblock, left=1.5cm of disp] (main) {Bucle Principal\\(\texttt{main} / \texttt{wfi})};
+                    \node[taskblock, below=1.5cm of disp] (tasks) {Tareas de Usuario\\(\texttt{Task1}, \texttt{Task2}, \texttt{Task3})};
+
+                    % --- CAJAS DE DELIMITACIÓN DE CONTEXTO ---
+                    \begin{pgfonlayer}{background}
+                        \node[draw=purple!40, fill=purple!5, dashed, rounded corners=5pt, fit=(hw) (systick_h) (callback) (sched), label={[purple!80!black]above:\textbf{Contexto de Interrupción}}] {};
+                        \node[draw=orange!40, fill=orange!5, dashed, rounded corners=5pt, fit=(main) (disp) (tasks), label={[orange!80!black]below:\textbf{Contexto de Usuario (Hilo Principal)}}] {};
+                    \end{pgfonlayer}
+
+                    % --- LLAMADAS DIRECTAS DE FUNCIÓN (LÍNEAS CONTINUAS) ---
+                    \draw[arrow, red!70!black] (hw) -- node[above, font=\tiny\bfseries] {ISR} (systick_h);
+                    \draw[arrow] (systick_h) -- (callback);
+                    \draw[arrow] (callback) -- (sched);
+                    
+                    \draw[arrow] (main) -- (disp);
+                    \draw[arrow] (disp) -- (tasks);
+
+                    % --- INTERACCIÓN CON BANDERAS Y DATOS (LÍNEAS DISCONTINUAS) ---
+                    \draw[dataarrow] (sched) |- node[near start, left, font=\tiny] {Escribe \texttt{ready = 1}} (data);
+                    \draw[dataarrow] (disp.east) -- node[above, font=\tiny] {Lee/Resetea \texttt{ready}} (data);
+
+                \end{tikzpicture}
+                \caption{Arquitectura de llamadas a funciones e interacción de datos entre ISR e Hilo Principal.}
+                \label{fig:general_execution_diagram}
+            \end{figure}
+
+            Es decir, la función del \emph{scheduler} es la de organizar qué tareas se pueden ejecutar, si es que ya les toca su ``hora''. Por su parte, el \emph{dispatcher} se encargará de lanzarlas a ejecución. La lógica que pongamos dentro de cada uno será lo que determine qué tareas tienen más o menos prioridad. El \emph{ticker} de sistema será el que vaya dictando cuándo se ejecutan estas dos funciones, ya que llamará al \emph{scheduler} en cada \emph{tick}, y a la vez despertará al procesador en caso de estar esperando en la instrucción \lstinline|__asm volatile ("wfi");| (\emph{wait for interrupt}).
+
+            Lo primero que necesitamos es modificar ligeramente el fichero \texttt{bsp.h} (separándolo en \texttt{bsp.h} y \texttt{bsp.c}) para incluir la llamada a la función \texttt{SysTick\_UserCallback}. Así tendremos el aviso de que ha habido un \emph{tick}. (No se puede hacer todo en \texttt{bsp.h} ya que saldrán errores de redefinición de funciones y/o variables)
+
+            \begin{lstlisting}
+                //en bsp.h, quitamos la implementacion del Handler, y
+                //declaramos la variable msTicks como extern volatile
+                //para indicar que se define en el bsp.c
+                extern volatile uint32_t msTicks;
+
+                void SysTick_UserCallback(void);
+                void SysTick_Handler(void);
+
+
+                //código para bsp.c
+                #include "bsp.h"
+
+                volatile uint32_t msTicks = 0;
+
+                __attribute__((weak)) void SysTick_UserCallback(void) {
+                    // Default empty implementation
+                }
+
+                void SysTick_Handler(void) {
+                    msTicks++;
+                    SysTick_UserCallback();
+                }
+            \end{lstlisting}
+
+            Importante notar dos cosas: La variable msTicks que se define como externa en el \texttt{bsp.h} para que otros archivos que lo importen (como \texttt{main.c}) no lo redefinan, creando así conflictos en compilación. Por otro lado, la definición de \texttt{SysTick\_UserCallback} como \lstinline|__attribute__((weak))|, lo cual permite:
+
+            \begin{enumerate}
+                \item Tener ya la llamada hecha desde \texttt{bsp.c}.
+                \item Poder redefinir la función desde otro archivo (en este caso \texttt{main.c}) para que se llame a esa en su lugar.
+            \end{enumerate}
+    
+            Una vez modificado ya podemos atacar a \texttt{main.c}. Lo primero es definir las estructuras de tarea. Una tarea consta de una función a la que llamar, y datos sobre cada cuánto se tiene que llamar, y hace cuánto se ha llamado por última vez, para que el planificador pueda gestionar su ejecución:
+
+            \begin{lstlisting}
+                #define MAX_TASKS 10
+
+                // Task structure defining what a task is
+                typedef struct {
+                    void (*task_function)(void); // Pointer to the task function
+                    uint32_t period_ms;          // How often the task should execute (in ms)
+                    uint32_t last_run;           // The sys_ticks timestamp when it last executed
+                    uint8_t ready;				 // True if the task should run
+                } Task_TypeDef;
+
+                // Tasks in our program
+                static Task_TypeDef tasks[MAX_TASKS] = {0};
+            \end{lstlisting}
+
+            Las tareas en este caso son bien sencillas, simplemente parpadean unos LEDs:
+
+            \begin{lstlisting}
+                void Task_BlinkGreen(void) {
+                    GPIO_PIN_TOGGLE(GPIOB, 1);
+                }
+
+                void Task_BlinkBlue(void) {
+                    GPIO_PIN_TOGGLE(GPIOA, 5);
+                }
+
+                void Task_BlinkRed(void) {
+                    GPIO_PIN_TOGGLE(GPIOA, 7);
+                }
+            \end{lstlisting}
+
+            Ahora toca crear las funciones para gestionar tareas. Observa que \texttt{create\_task} recibe una función como argumento, que se guarda internamente en su estructura
+
+            \begin{lstlisting}
+                uint32_t create_task( void (*pfunction)(void), uint32_t period ) {
+                    uint32_t id;
+
+                    // ... completar buscar una entrada libre en la tabla de tareas
+                    id = 
+
+                    // ... completar inicializar los campos de la tarea
+
+                    return id;
+                }
+
+                void delete_task (uint32_t id ) {
+                    tasks[id].task_function = 0;
+                    tasks[id].period_ms = 0;
+                    tasks[id].last_run = 0;
+                    tasks[id].ready = 0;
+                }
+
+                void scheduler_init (void) {
+                    uint32_t id;
+                    for( id=0; id<MAX_TASKS; id++ )
+                        delete_task( id );
+                }
+            \end{lstlisting}
+
+            Con las tareas creadas, ya sólo nos queda crear el planificador y el despachador. Para el planificador, basta recorrer la lista de tareas y, si ya le toca ejecutarse (comprueba que desde la última vez que se ejecutó, ya ha pasado el tiempo suficiente), la marcamos como \emph{ready}:
+
+            \begin{lstlisting}
+                void scheduler (void) {
+                    uint32_t tick_actual = GetTick();
+                    for (uint32_t id = 0; id < MAX_TASKS; id++)
+                        if (tasks[id].task_function) //if there is a task here
+                           {
+                            // ... completar: si le toca ejecutar, marcar como ready
+                           }
+                }
+            \end{lstlisting}
+
+            El dispatcher, simplemente lo que hará será ejecutar las tareas que estén listas:
+
+            \begin{lstlisting}
+                void dispacher (void) {
+                    uint32_t id;
+                    for (id = 0; id < MAX_TASKS; id++)
+                        if (tasks[id].ready) {
+                            // así se ejecuta un puntero a función
+                            // por si alguna vez te lo habías preguntado
+                            // (probablemente no, pero a que mola?)
+                            (*tasks[id].task_function)();
+                            tasks[id].ready = 0;
+                        }
+                }
+            \end{lstlisting}
+
+            Y listo! Ya solo nos falta conectar el \emph{callback} del \PER{SYSTICK} para que llame a nuestro \emph{scheduler} cada vez que se dispare:
+
+            \begin{lstlisting}
+                void SysTick_UserCallback() {
+                    scheduler();
+                }
+            \end{lstlisting}
+
+            Si hemos hecho bien todo y lo ejecutamos, deberíamos ver parpadear los 3 leds en diferentes frecuencias. Por detrás, lo que está ocurriendo es que 1000 veces por segundo se está disparando el \emph{scheduler}, y a continuación el \emph{dispatcher} al despertar el procesador de su espera. En caso de encontrar funciones para ejecutar, las lanza. Si no, se vuelve a dormir. Si una función tarda más de un hueco (o \emph{timeslot}) en ejecutarse, simplemente el \emph{dispatcher} no se lanzará en ese ciclo. Podemos ver este detalle en la \Cref{fig:exec_detail}.
+
+            \begin{figure}[htbp]
+                \centering
+                \begin{tikzpicture}[
+                    font=\sffamily\small,
+                    >=Stealth,
+                    lane label/.style={font=\sffamily\bfseries\footnotesize, align=right, anchor=east},
+                    block/.style={draw, rounded corners=1pt, minimum height=0.35cm, inner sep=0pt}
+                ]
+
+                    % --- ESTILOS DE BLOQUES Y LEYENDA ---
+                    \tikzset{
+                        systick/.style={fill=purple!60, draw=purple!90!black},
+                        scheduler/.style={fill=orange!70, draw=orange!90!black},
+                        dispatcher/.style={fill=yellow!80!orange, draw=orange!90!black},
+                        task1/.style={fill=cyan!60, draw=cyan!80!black},
+                        cpuactive/.style={fill=yellow!40, draw=yellow!70!black},
+                        cpusleep/.style={fill=gray!25, draw=gray!40}
+                    }
+
+                    % =========================================================================
+                    % PARTE 1: VISIÓN MACRO (0 ms a 500 ms)
+                    % =========================================================================
+                    \node[font=\sffamily\bfseries\small, anchor=west] at (-0.2, 7.2) {1. Visión Macro (0 a 500 ms): Ocurren 500 interrupciones de SysTick (1 ms)};
+
+                    % Carril SysTick Comb (Peine de impulsos cada 1 ms)
+                    \node[lane label] at (-0.2, 6.4) {SysTick (1ms)};
+                    \draw[gray!20, line width=0.25cm] (0, 6.4) -- (10, 6.4);
+                    % Ráfaga densa de líneas representando las 500 interrupciones de 1ms
+                    \foreach \x in {0,0.08,...,10} {
+                        \draw[purple!80!black, line width=0.4pt] (\x, 6.28) -- (\x, 6.52);
+                    }
+
+                    % Carril Estado CPU Macro
+                    \node[lane label] at (-0.2, 5.7) {Estado CPU};
+                    \node[block, cpusleep, anchor=west, minimum width=10cm] at (0, 5.7) {};
+                    % Pequeños micro-picos de CPU activa cada 1ms
+                    \foreach \x in {0,0.08,...,10} {
+                        \draw[yellow!90!black, line width=0.5pt] (\x, 5.53) -- (\x, 5.87);
+                    }
+                    % Bloque de trabajo real a los 250ms (x = 5.0) y 500ms (x = 10.0)
+                    \node[block, cpuactive, anchor=west, minimum width=0.6cm] at (5.0, 5.7) {};
+                    \node[block, cpuactive, anchor=west, minimum width=0.9cm] at (9.9, 5.7) {};
+
+                    % Eje macro
+                    \draw[->, thick] (0, 5.2) -- (10.4, 5.2) node[right, font=\sffamily\tiny] {Tiempo};
+                    \foreach \x/\t in {0/0ms, 2.5/125ms, 5.0/250ms, 7.5/375ms, 10.0/500ms} {
+                        \draw[thick] (\x, 5.15) -- (\x, 5.25);
+                        \node[below, font=\sffamily\tiny] at (\x, 5.15) {\t};
+                    }
+
+                    % Ventana de Zoom sobre t = 250ms
+                    \draw[red!80!black, thick, dashed] (4.6, 5.0) rectangle (5.8, 6.7);
+                    \node[red!80!black, font=\sffamily\bfseries\tiny, above] at (5.2, 6.7) {Lupa de detalle (248 a 252 ms)};
+
+                    % Líneas de proyección hacia el Zoom
+                    \draw[red!60, dashed] (4.6, 5.0) -- (0, 3.8);
+                    \draw[red!60, dashed] (5.8, 5.0) -- (10, 3.8);
+
+                    % =========================================================================
+                    % PARTE 2: VISTA DETALLADA / ZOOM (248 ms a 252 ms)
+                    % =========================================================================
+                    \begin{scope}[shift={(0, 0)}]
+                        \node[font=\sffamily\bfseries\small, anchor=west] at (-0.2, 3.8) {2. Detalle de ejecución alrededor de los 250 ms (Escala real a nivel de ms)};
+
+                        % Carriles Zoom
+                        \node[lane label] at (-0.2, 3.0) {SysTick / Sched};
+                        \node[lane label] at (-0.2, 2.3) {Dispatcher};
+                        \node[lane label] at (-0.2, 1.6) {Task 1};
+                        \node[lane label] at (-0.2, 0.9) {Estado CPU};
+
+                        \foreach \y in {3.0, 2.3, 1.6} {
+                            \draw[gray!15, line width=0.35cm] (0, \y) -- (10, \y);
+                        }
+                        % Fondo de CPU en reposo
+                        \node[block, cpusleep, anchor=west, minimum width=10cm] at (0, 0.9) {};
+
+                        % Marcas de ms (248, 249, 250, 251, 252) -> 1 ms = 2.0 cm
+                        \draw[->, thick] (0, 0.3) -- (10.4, 0.3) node[right, font=\sffamily\tiny] {Tiempo};
+                        \foreach \x/\t in {0/248ms, 2.5/249ms, 5.0/250ms, 7.5/251ms, 10.0/252ms} {
+                            \draw[gray!40, dashed] (\x, 0.3) -- (\x, 3.3);
+                            \draw[thick] (\x, 0.25) -- (\x, 0.35);
+                            \node[below, font=\sffamily\tiny] at (\x, 0.25) {\t};
+                        }
+
+                        % --- TICK 248 ms (Evaluación sin cambios) ---
+                        \node[block, systick, anchor=west, minimum width=0.15cm] at (0, 3.0) {};
+                        \node[block, scheduler, anchor=west, minimum width=0.15cm] at (0.15, 3.0) {};
+                        \node[block, dispatcher, anchor=west, minimum width=0.2cm] at (0.3, 2.3) {};
+                        \node[block, cpuactive, anchor=west, minimum width=0.5cm] at (0, 0.9) {};
+                        \node[font=\sffamily\tiny\color{gray!80!black}, anchor=west] at (0.55, 0.9) {Sleep (\texttt{wfi})};
+
+                        % --- TICK 249 ms (Evaluación sin cambios) ---
+                        \node[block, systick, anchor=west, minimum width=0.15cm] at (2.5, 3.0) {};
+                        \node[block, scheduler, anchor=west, minimum width=0.15cm] at (2.65, 3.0) {};
+                        \node[block, dispatcher, anchor=west, minimum width=0.2cm] at (2.8, 2.3) {};
+                        \node[block, cpuactive, anchor=west, minimum width=0.5cm] at (2.5, 0.9) {};
+                        \node[font=\sffamily\tiny\color{gray!80!black}, anchor=west] at (3.05, 0.9) {Sleep (\texttt{wfi})};
+
+                        % --- TICK 250 ms (¡Coincidencia de Temporización!) ---
+                        \node[block, systick, anchor=west, minimum width=0.15cm] at (5.0, 3.0) {};
+                        \node[block, scheduler, anchor=west, minimum width=0.2cm] at (5.15, 3.0) {};
+                        \node[block, dispatcher, anchor=west, minimum width=0.2cm] at (5.35, 2.3) {};
+                        \node[block, task1, anchor=west, minimum width=1.95cm] at (5.55, 1.6) {};
+                        % CPU Activa durante todo el proceso a los 250ms
+                        \node[block, cpuactive, anchor=west, minimum width=2.5cm] at (5.0, 0.9) {};
+
+                        % --- TICK 251 ms (Siguiente Tick habitual) ---
+                        \node[block, systick, anchor=west, minimum width=0.15cm] at (7.5, 3.0) {};
+                        \node[block, scheduler, anchor=west, minimum width=0.15cm] at (7.65, 3.0) {};
+                        \node[block, task1, anchor=west, minimum width=0.5cm] at (7.8, 1.6) {};
+                        \node[block, cpuactive, anchor=west, minimum width=0.8cm] at (7.5, 0.9) {};
+                        \node[font=\sffamily\tiny\color{gray!80!black}, anchor=west] at (8.3, 0.9) {Sleep (\texttt{wfi})};
+
+                    \end{scope}
+
+                \end{tikzpicture}
+                \caption{Detalle de ejecución de los diferentes elementos de nuestro planificador, con una tarea que tarda más de un \emph{slot}}
+                \label{fig:exec_detail}
+            \end{figure}
+
+            \subsubsection{Fragilidad de la aproximación}
+
+                Añade una tarea que no funcione ``bien'' (por ejemplo que entre en un bucle de espera con \lstinline|Delay_ms|). ¿Qué pasa con la ejecución del resto? Comprueba también que pasa si esta tarea está la primera o la última. ¿Cómo piensas que podría solucionarse este problema?
+
+    \subsection{Para hacer más}
+
+        En sistemas complejos, y para evitar bloqueos, se suelen introducir prioridades a las tareas, a fin de que las tareas más prioritarias (del sistema) puedan pasar primero. Incluye un sistema de prioridades a las tareas, donde tareas con una prioridad más alta se ejecuten siempre primero. (\textbf{NOTA:} al ser un planificador \emph{cooperativo}, podrían bloquearse igualmente si una tarea no cede su turno, no te preocupes si ocurre).
+ 
+\end{document}
