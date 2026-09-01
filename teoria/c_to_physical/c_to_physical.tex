@@ -1,0 +1,275 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\section{Del código de alto nivel a la memoria física}
+
+    Los lenguajes de alto nivel son cada vez más abstractos. En un origen, la programación se hacía directamente en ensamblador, atacando directamente al conjunto de instrucciones del propio procesador. Con la creación y avance de los compiladores, estos se sustituyeron por lenguajes algo más abstractos como \texttt{COBOL}, \texttt{Pascal}, o en última instancia \texttt{C}, incluyendo conceptos como funciones o tipos, e incluso multitarea. Posteriormente, se introdujeron lenguajes más complejos como \texttt{C++}, que añade clases, orientación a objetos, plantillas, y multitud de comodidades en versiones más recientes como programación funcional, pero aún con posibilidades cercanas al hardware. Hoy en día, la mayor parte de los programadores trabajan en lenguajes de aún más alto nivel, como \texttt{Java} o \texttt{Python}, que ni siquiera se ejecutan en su mayor parte directamente sobre hardware, sino sobre máquina virtual, lo cual permite estilos de programación muy flexibles donde el concepto de tipos o funciones se diluye.
+    
+    Esta evolución la permite, en parte, el \emph{stack} tecnológico que vive debajo: Un procesador complejo, sobre el que se ejecuta un sistema operativo, que a su vez tiene un intérprete instalado al que ofrece interfaces de control, sobre el cual finalmente se ejecuta el lenguaje de nuestra elección.
+
+    Sin embargo, sigue habiendo nichos donde tener toda esta pila de herramientas no es posible: uno de ellos son los sistemas empotrados.
+
+    Un sistema empotrado, aunque su definición sea en ocasiones difusa, suele tener capacidades muy reducidas, y estar diseñado para funciones muy específicas. Dada la simplicidad de su diseño, los procesadores que incluyen no soportarían (o serían demasiado lentos) un sistema con la complejidad como para ejecutar todos estos lenguajes modernos. Por tanto, aún se siguen utilizando lenguajes más simples y con características más cercanas al hardware. En concreto, el lenguaje rey en este ámbito sigue siendo \texttt{C}. Aún y con todo, \texttt{C} sigue siendo un lenguaje de alto nivel, y conviene entender cómo nos va a permitir trabajar directamente con el \emph{hardware}.
+
+    \subsection{La estructura del hardware - dispositivos mapeados en memoria}
+
+        Un procesador, por sí solo, no es más que una máquina de ejecutar instrucciones. Según el conjunto de instrucciones con que diseñemos nuestro procesador, le daremos más o menos capacidades. Aún así, muchas de las capacidades no residen en el propio núcleo en sí, sino en periféricos asociados que liberan de trabajo al \emph{core} ejecutor de tareas. 
+
+        En las arquitecturas de microcontroladores modernas (como la familia ARM Cortex-M), el procesador utiliza, para comunicarse con dichos periféricos, un esquema denominado \emph{Memory-Mapped I/O} (MMIO). Así, para comunciarse con los periféricos del procesador, no se utilizan instrucciones específicas. En su lugar, todos los periféricos comparten el mismo espacio de direccionamiento de $32$~bits ($4GB$ de direcciones) junto con la memoria de programa (Flash) y la memoria de datos (RAM).
+
+        \begin{itemize}
+            \item \textbf{Memoria Flash} (\texttt{0x08000000}): Almacena el código compilado, constantes, e información persistente. Es memoria no volátil, que se mantiene tras un apagado o reinicio del sistema.
+            \item \textbf{Memoria SRAM} (\texttt{0x20000000}): Almacena las variables globales, la pila (\emph{stack}) y el montón (\emph{heap}). Es memoria volátil de acceso rápido, que se reinicia en cada inicio del sistema.
+            \item \textbf{Periféricos} (\texttt{0x40000000} - \texttt{0x50000000} y otros): Colección de registros físicos mapeados directamente en direcciones de memoria fijas.
+        \end{itemize}
+
+        Desde la perspectiva del procesador, escribir en la dirección \texttt{0x40020000} no difiere sintácticamente de escribir en una variable almacenada en la RAM. Sin embargo, la circuitería del bus redirige esa operación al controlador del periférico correspondiente (por ejemplo, puerto de entrada/salida de propósito general), provocando un cambio de estado ajeno al procesador, como por ejemplo el encendido de un LED.
+
+    \subsection{El acceso a memoria - punteros y direcciones}
+
+        Para interactuar con las direcciones físicas descritas en el modelo MMIO desde el lenguaje \texttt{C}, se emplean punteros. En \texttt{C}, debemos trabajar manualmente con valores numéricos (representando dichas direcciones) para conseguir acceder a las mismas. Un puntero se describe de la siguiente manera:
+
+        \begin{lstlisting}
+            #include <stdint.h>
+
+            uint32_t * puntero;
+        \end{lstlisting}
+
+        \textbf{NOTA: } Es fundamental utilizar tipos de datos con ancho de bits garantizado mediante la librería de la cabecera estándar \texttt{<stdint.h>} (como \lstinline|uint32_t, uint16_t, uint8_t|), evitando tipos ambiguos como \texttt{int} o \texttt{long} cuyo tamaño puede variar según arquitectura y compilador.
+
+        Un puntero no es más que una dirección de memoria. En este caso, \lstinline|uint32_t *| representa ``dirección de memoria donde hay almacenado un \lstinline|uint32_t|''. Si queremos cambiar ese valor, guardado en dicha dirección de memoria, haremos:
+
+        \begin{lstlisting}
+            *puntero = 20;
+        \end{lstlisting}
+
+        Y, si queremos cambiar la dirección de memoria a la que apuntamos, haremos:
+
+        \begin{lstlisting}
+            puntero = (uint32_t *) 0x40020000U;
+        \end{lstlisting}
+
+        Así, conociendo la dirección de memoria a través de la cual podemos acceder a un periférico (por ejemplo para encender un LED), podemos escribir en ese preciso lugar de la siguiente manera:
+
+        \begin{lstlisting}
+            #include <stdint.h>
+
+            // Macro para poder cambiar fácilmente la dirección
+            #define DIRECCION_OBJETIVO (0x40020000U)
+
+            void encender_led(void) {
+                // 1) creación de nuestro puntero (indicamos el tipo del mismo)
+                uint32_t * p_led = (uint32_t *) GPIOA_MODER_ADDR;
+
+                // 2) Escribimos sobre esa dirección de memoria
+                *p_led = 0x00000001; 
+            }
+        \end{lstlisting}
+
+        En la práctica, se suelen combinar ambas operaciones en una única macro para facilitar la escritura de código:
+
+        \begin{lstlisting}
+            #define REGISTRO_LED  (*(volatile uint32_t *) 0x40020000U)
+            // Ahora podemos utilizar la macro como si fuera una variable
+            REGISTRO_LED = 0x00000001;
+        \end{lstlisting}
+
+        Si aún quedan dudas, consulta la \Cref{fig:tabla_memoria_puntero_led} para verlo en forma de diagrama.
+
+
+        \begin{figure}[htbp]
+        \centering
+        \begin{tikzpicture}[
+            font=\small\sffamily,
+            % Estilos de la tabla de memoria
+            hdrbox/.style={draw=black!80, fill=gray!25, thick, font=\bfseries\small, minimum height=0.75cm, align=center},
+            addrbox/.style={draw=black!70, fill=gray!8, thick, font=\ttfamily\footnotesize\bfseries, minimum height=0.85cm, minimum width=2.8cm, align=center},
+            rambox/.style={draw=black!70, fill=blue!10, thick, minimum height=0.85cm, minimum width=4.6cm, align=center},
+            mmiostyle/.style={draw=black!70, fill=orange!15, thick, minimum height=0.85cm, minimum width=4.6cm, align=center},
+            gapstyle/.style={draw=black!30, fill=black!4, dashed, minimum height=0.65cm},
+            % Código C y componentes externos
+            codebox/.style={draw=purple!80!black, fill=purple!5, thick, rounded corners=3pt, align=left, font=\ttfamily\small, inner sep=6pt},
+            hwbox/.style={draw=orange!80!black, fill=orange!8, thick, rounded corners=4pt, align=center, inner sep=7pt},
+            % Flechas
+            ptrarrow/.style={-{Stealth[scale=1.1]}, very thick, color=blue!70!black},
+            writearrow/.style={-{Stealth[scale=1.1]}, thick, dashed, color=red!70!black},
+            hwarrow/.style={-{Stealth[scale=1.2]}, thick, color=orange!80!black}
+        ]
+
+            % ==========================================
+            % 1. TABLA DE MEMORIA (Centro)
+            % ==========================================
+
+            % Cabecera de la tabla
+            \node[hdrbox, minimum width=2.8cm] (hdr_addr) {Dirección};
+            \node[hdrbox, minimum width=4.6cm, right=0cm of hdr_addr] (hdr_data) {Contenido};
+
+            % Fila 1: RAM (Stack)
+            \node[addrbox, below=0cm of hdr_addr] (r1_addr) {0x20000100};
+            \node[rambox, below=0cm of hdr_data] (r1_data) {\textbf{\texttt{p\_led}} \ \ (Valor: \texttt{0x40020000})};
+
+            % Fila 2: Separador / Espacio intermedio
+            \node[addrbox, gapstyle, below=0cm of r1_addr] (r2_addr) {\dots};
+            \node[rambox, gapstyle, minimum width=4.6cm, below=0cm of r1_data] (r2_data) {\textit{\footnotesize Espacio de memoria intermedio}};
+
+            % Fila 3: MMIO (Periféricos)
+            \node[addrbox, below=0cm of r2_addr] (r3_addr) {0x40020000};
+            \node[mmiostyle, below=0cm of r2_data] (r3_data) {\textbf{\texttt{GPIO}} \ \ (Valor: \texttt{0x00000001})};
+
+            % Etiquetas decorativas de zona
+            \node[left=0.15cm of r1_addr, font=\tiny\bfseries, color=blue!80!black, rotate=90, anchor=center] (ramtag) {RAM};
+            \node[left=0.15cm of r3_addr, font=\tiny\bfseries, color=orange!90!black, rotate=90, anchor=center] (mmiotag) {MMIO};
+
+            % ==========================================
+            % 2. CÓDIGO C Y ACCIONES (Izquierda)
+            % ==========================================
+
+            % Código 1: Declaración de puntero
+            \node[codebox, left=2.2cm of r1_addr, anchor=east] (code1) {
+                uint32\_t *p\_led = \\
+                \ \ (uint32\_t *) 0x40020000U;
+            };
+
+            % Código 2: Escritura por desreferenciación
+            \node[codebox, left=2.2cm of r3_addr, anchor=east] (code2) {
+                *p\_led = 0x00000001;
+            };
+
+            % Flechas desde el código a la tabla
+            \draw[-{Stealth}, thick, color=purple!80!black] (code1.east) -- (ramtag.north) 
+                node[midway, above, font=\tiny\sffamily, align=center] {Almacena dirección};
+
+            \draw[writearrow] (code2.east) -- (mmiotag.north) 
+                node[midway, above, font=\tiny\sffamily, color=red!70!black, align=center] {Escribe vía \texttt{*p\_led}};
+
+            % ==========================================
+            % 3. PUNTERO APUNTANDO A LA DIRECCIÓN (Derecha)
+            % ==========================================
+
+            % Flecha que conecta el contenido del puntero en RAM con la dirección en MMIO
+            \draw[ptrarrow] (r1_data.east) to[out=0, in=0, looseness=1.5] 
+                node[midway, right, font=\footnotesize\bfseries, color=blue!70!black, align=left] {
+                    \texttt{p\_led}\\
+                    apunta a\\
+                    \texttt{0x40020000}
+                } (r3_data.east);
+
+            % ==========================================
+            % 4. HARDWARE EXTERNO (Abajo)
+            % ==========================================
+
+            \node[hwbox, below=1.0cm of r3_data] (hw_led) {
+                \textbf{Circuito Físico Externo} \\
+                \footnotesize GPIO $\longrightarrow$ Resistencia $\longrightarrow$ \textbf{LED}
+            };
+
+            % Conexión de la celda MMIO con el LED hardware
+            \draw[hwarrow] (r3_data.south) -- (hw_led.north)
+                node[midway, right, font=\tiny\bfseries, color=orange!90!black] {
+                    \textit{Señal eléctrica (3.3V)}
+                };
+
+        \end{tikzpicture}
+        \caption{Esquema de las dos direcciones de memoria involucradas con un puntero: la dirección a la que apunta, y el valor apuntado.}
+        \label{fig:tabla_memoria_puntero_led}
+        \end{figure}
+
+
+    \subsection{Las operaciones bit a bit - manipulación de registros}
+
+        Un registro de un periférico de 32 bits suele alojar múltiples configuraciones independientes; cada bit o grupo de bits controla una función específica (por ejemplo, velocidad, dirección de un pin o activación de interrupciones). Por ello, escribir directamente un valor entero (como \texttt{REGISTRO\_LED = 0x00000001}) suele ser peligroso, ya que sobrescribe y destruye la configuración de los 30 bits restantes.
+
+        Para modificar únicamente los bits de interés sin alterar los demás, se utiliza el patrón \emph{Read-Modify-Write} (Lectura-Modificación-Escritura) mediante operadores bit a bit (\emph{bitwise}):
+
+        \begin{itemize}
+            \item \textbf{Establecer bits a `1':}
+                \begin{lstlisting}
+                    //ponemos el bit '0' a '1', resto se mantienen
+                    REGISTRO_LED |= 0x00000001;
+                    //ponemos todos los bits a '1' salvo el bit '0'
+                    //que se mantiene
+                    REGISTRO_LED |= 0xFFFFFFFE;
+                \end{lstlisting}
+
+            \item \textbf{Borrar bits a `0':}
+                \begin{lstlisting}
+                    //ponemos el bit '0' a '0', resto se mantienen
+                    REGISTRO_LED &= ~0x00000001;
+                    //borramos todos los bits salvo el bit '0'
+                    //que se mantiene
+                    REGISTRO_LED &= 0x00000001;
+                \end{lstlisting}
+
+            \item \textbf{Alternar estado:}
+                \begin{lstlisting}
+                    //cambiamos el bit '0' (de '1' a '0' o de '0' a '1')
+                    //resto se mantienen
+                    REGISTRO_LED ^= 0x00000001;
+                    //cambiamos todos los bits excepto el '0'
+                    REGISTRO_LED ^= 0xFFFFFFFE;
+                \end{lstlisting}
+
+            \item \textbf{Leer bits individuales:}
+                \begin{lstlisting}
+                    //leemos el bit '0'
+                    uint32_t valor = REGISTRO_LED & 0x00000001;
+                    //leemos el bit '16' y lo movemos a la derecha
+                    uint32_t valor = (REGISTRO_LED & 0x00010000) >> 16;
+                \end{lstlisting}
+        \end{itemize}
+
+        Hay que tener siempre en cuenta que los bits en los que haya que escribir, dependerán del funcionamiento del periférico mapeado en memoria. También, en ocasiones, solo leer el valor desencadena funciones del periférico. Por tanto será muy importante leer su documentación. Imaginemos un registro mapeado en memoria donde hay que modificar los bits 14 y 15 para escribir una configuración:
+
+        \begin{lstlisting}
+            // El Pin 7 ocupa los bits [15:14] del registro GPIOA_MODER (2 bits por pin)
+            // Se requiere escribir el valor '01' (salida) en las posiciones 15 y 14.
+
+            // Borrar bits 15 y 14 usando una máscara invertida
+            GPIOA_MODER &= ~(0b11U << (7 * 2)); 
+            // 0bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+            // 0b11111111111111110011111111111111 &
+            // ----------------------------------
+            // 0bxxxxxxxxxxxxxxxx00xxxxxxxxxxxxxx
+
+            // Poner el valor '01' en dichos bits
+            GPIOA_MODER |=  (0b01U << (7 * 2)); 
+            // 0bxxxxxxxxxxxxxxxx00xxxxxxxxxxxxxx
+            // 0b00000000000000000100000000000000 |
+            // ----------------------------------
+            // 0bxxxxxxxxxxxxxxxx01xxxxxxxxxxxxxx
+        \end{lstlisting}
+
+        
+
+    \subsection{Definiciones vs variables - el espacio utilizado}
+
+        En un microcontrolador, los recursos de memoria son escasos (por ejemplo, $512KB$ de Flash y $1MB$ de RAM). Es importante conocer qué recursos consume cada elemento en \texttt{C} a fin de ahorrar espacio.
+
+        \begin{itemize}
+            \item \textbf{Directivas del preprocesador (\texttt{\#define}):} No consumen memoria RAM ni Flash por sí mismas. El preprocesador realiza una sustitución textual antes de la compilación.
+            \item \textbf{Variables globales no inicializadas (\texttt{.bss}):} Se ubican exclusivamente en la RAM (pues la flash no se puede modificar directamente en tiempo de ejecución). Al arrancar el programa, el código de inicio las inicializa automáticamente a cero.
+            \item \textbf{Variables globales inicializadas (\texttt{.data}):} Ocupan espacio en memoria Flash (donde se guarda su valor inicial de fábrica) y en memoria RAM (donde se copian durante el arranque para permitir su modificación).
+            \item \textbf{Constantes (\texttt{const}):} Si se declaran con el calificador \texttt{const}, el compilador las ubica en la sección de solo lectura de la memoria Flash (\texttt{.rodata}), evitando ocupar memoria RAM.
+            \item \textbf{Variables locales:} Se crean dinámicamente en la pila (\emph{stack}) ubicada en RAM durante la ejecución de las funciones y se destruyen automáticamente al salir del ámbito.
+        \end{itemize}
+
+        Es importante conocer que esta distribución no es estrictamente así, ya que cambios en el script de enlazado (o \emph{linker script}) podrán modificarla. Pero en líneas generales podemos asumir que se distribuyen de esta manera.
+
+        \begin{lstlisting}
+            #define CONFIG_MASK  0x00FFU       // Sustitución textual, 0 bytes consumidos
+
+            const uint32_t calib = 0xF412AB00; // Memoria Flash (.rodata), 0 bytes en RAM
+            uint32_t contador_global;          // Memoria RAM (.bss), 4 bytes
+            uint32_t estado_inicial = 0xAA;    // Memoria RAM (.data) + copia en Flash
+
+            void proceso(void) {
+                uint8_t buffer_local[16];      // Stack (en RAM) mientras dure la función
+            }
+        \end{lstlisting}
+
+
+
+
+
+\end{document}

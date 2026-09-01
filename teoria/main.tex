@@ -1,0 +1,76 @@
+\documentclass[11pt,spanish,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[es-tabla]{babel}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{cleveref} 
+
+\usepackage{listings}
+\usepackage{lstautogobble}
+\usepackage{xcolor}
+
+
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, shapes.multipart, calc}
+
+\usepackage{subfiles} % Required for subfile compilation
+
+%%%% HIGHLIGHTS %%%%%
+% Define colors
+\definecolor{lightyellow}{HTML}{FFFFF4} % Ultra-faint, subtle warm yellow background
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codeblue}{rgb}{0.1,0.1,0.7}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{codegreen}{rgb}{0.0,0.5,0.0} % Dark green for clean legibility
+
+\lstset{
+    language=C,
+    autogobble=true,
+    backgroundcolor=\color{lightyellow}, % Very faint background
+    basicstyle=\ttfamily\footnotesize,
+    numbers=left,
+    numberstyle=\tiny\color{codegray},
+    stepnumber=1,
+    numbersep=10pt,
+    keywordstyle=\color{codeblue}\bfseries,
+    commentstyle=\color{codegreen}, % Green comments
+    stringstyle=\color{codepurple},
+    breaklines=true,
+    showstringspaces=false,
+    tabsize=4,
+    frame=single,
+    rulecolor=\color{gray!25},
+    framesep=4pt,
+    % --- Spanish character support (utf-8 / pdflatex) ---
+    inputencoding=utf8,
+    extendedchars=true,
+    literate=
+      {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+      {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+      {ñ}{{\~n}}1 {Ñ}{{\~N}}1 {¿}{{{\textquestiondown}}}1 {¡}{{{\textexcldown}}}1
+}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\setlength{\parskip}{1em}
+
+\title{Teoría de PSyD}
+\author{Daniel Báscones García}
+\date{\today}
+
+\begin{document}
+
+    \setlength{\parskip}{0em}
+    \maketitle
+    \tableofcontents
+    \setlength{\parskip}{1em}
+
+    \newpage
+    % Aquí se irán incluyendo los temas individuales
+    \subfile{c_to_physical/c_to_physical}
+    \newpage
+    \subfile{hardware_structs/hardware_structs}
+    \newpage
+    \subfile{linking/linking}
+    \newpage
+
+\end{document}

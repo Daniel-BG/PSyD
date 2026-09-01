@@ -1,0 +1,132 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\section{Estructuras y definiciones de hardware}
+
+    Más allá de los accesos a memoria, para gestionar todos los elementos mapeados en memoria del procesador y periféricos, existen ciertas construcciones en C que permiten facilitar el trabajo al programador de diferentes maneras. Entre ellas, podremos evitar optimizaciones no deseadas con la palabra clave \lstinline|volatile|, generar \lstinline|struct| que representen periféricos, acceder a nivel de bits con los campos de bits, u optimizar llamadas a funciones \lstinline|static inline|.
+
+    \subsection{La palabra clave \lstinline|volatile|}
+
+        El optimizador del compilador asume un entorno de ejecución mono-hilo clásico, donde los valores almacenados en memoria solo cambian mediante instrucciones explícitas del propio código. Bajo esta premisa, si el compilador detecta lecturas repetidas a una misma dirección de memoria dentro de un bucle, optimiza el acceso cargando dicho valor en un registro interno del procesador y reutilizándolo, evitando lecturas redundantes al bus de datos.
+
+        En sistemas empotrados, esta optimización no es correcta: los registros mapeados en memoria, o las variables compartidas con Rutinas de Servicio de Interrupción (ISR) cambian de valor de forma asíncrona debido al hardware externo.
+
+        \begin{lstlisting}
+            // Direccion de un registro de estado del hardware (por ejemplo, UART RX Ready)
+            #define UART_STATUS_REG (*(uint32_t *) 0x40001000U)
+
+            void esperar_datos(void) {
+                // El compilador lee el registro UNA SOLA VEZ y genera un bucle infinito
+                // en ensamblador si el valor inicial era 0: "if (!reg) while(1);"
+                while ((UART_STATUS_REG & 0x01U) == 0) {
+                    // Bucle de espera activa (Busy-wait)
+                }
+            }
+        \end{lstlisting}
+
+        Al calificar una variable o puntero con \lstinline|volatile|, se le indica explícitamente al compilador que no optimice sus accesos y lo lea explícitamente cada vez que el código lo requiera. Así, cada lectura o escritura escrita en \texttt{C} se traduce explíctamente en una instrucción física de lectura o escritura en la memoria.
+
+        \begin{lstlisting}
+            // Puntero a registro hardware: siempre calificado como volatile
+            #define UART_STATUS_REG (*(volatile uint32_t *) 0x40001000U)
+
+            // Variable global modificada dentro de una ISR
+            volatile uint8_t flag_interrupcion = 0; 
+        \end{lstlisting}
+
+    \subsection{Abstracción de Hardware con \lstinline|struct|}
+
+        Escribir macros o punteros independientes para cada uno de los decenas de registros que contiene un periférico sería, francamente, un rollo. Puesto que los registros de un periférico ocupan bloques contiguos de memoria, es habitual agruparlos dentro de un (\lstinline|struct|) de \texttt{C}.
+
+        Al definir la estructura, el compilador asigna a cada miembro direcciones consecutivas de memoria desde la inicial. Bastará por tanto con configurar adecuadamente esta dirección inicial del \lstinline|struct|, con la que especifiquen los manuales del procesador. 
+
+        \begin{lstlisting}
+            #include <stdint.h>
+
+            typedef struct {
+                volatile uint32_t MODER;   // Offset: 0x00 (Modo de los pines)
+                volatile uint32_t OTYPER;  // Offset: 0x04 (Tipo de salida)
+                volatile uint32_t OSPEEDR; // Offset: 0x08 (Velocidad de salida)
+                volatile uint32_t PUPDR;   // Offset: 0x0C (Resistencias Pull-up/Pull-down)
+                volatile uint32_t IDR;     // Offset: 0x10 (Registro de entrada)
+                volatile uint32_t ODR;     // Offset: 0x14 (Registro de salida)
+                uint32_t RESERVED[2];      // Offset: 0x18 - 0x1F (Hueco reservado en hardware)
+                volatile uint32_t BSRR;    // Offset: 0x20 (Bit Set/Reset Register)
+            } GPIO_TypeDef;
+
+            // Direccion base del periférico GPIOA 
+            #define GPIOA_BASE  (0x40020000U)
+
+            // Creación de la variable para manejar el periférico
+            #define GPIOA       ((GPIO_TypeDef *) GPIOA_BASE)
+
+            void ejemplo_estructura(void) {
+                // Acceso directo a cualquier registro del periférico
+                GPIOA->ODR   |= (1U << 7);   // Pone a '1' el Pin 7
+            }
+        \end{lstlisting}
+
+        \textbf{Alineación de memoria:} Es imprescindible respetar los huecos de direcciones no utilizadas mediante miembros de relleno (\texttt{RESERVED}), garantizando que cada miembro de la estructura coincida exactamente con la dirección del registro físico correspondiente. También hay que tener cuidado si se utilizan miembros de tipos cortos como \lstinline|uint16_t| o \lstinline|uint8_t|, ya que el compilador podría introducir huecos por su propia cuenta para que variables completas de tipo \lstinline|uint32_t| estén alineadas a direcciones múltiplo de cuatro. Normalmente esto no es un problema, pero conviene tenerlo en cuenta.
+
+    \subsection{Utilización de \lstinline|union| y campos de bits}
+
+        Aunque las operaciones bit a bit con máscaras (\lstinline|&|, \lstinline|||) son el estándar industrial, \texttt{C} permite mapear campos de bits (\emph{bit-fields}) mediante \lstinline|struct| dentro de una \lstinline|union|. Esto habilita el acceso individual a un bit o grupo de bits sin requerir desplazamientos explícitos.
+
+        \begin{lstlisting}
+            typedef union {
+                uint32_t raw; // Acceso al registro completo de 32 bits
+                
+                struct {
+                    uint32_t ENABLE  : 1;  // Bit 0: Activación del periférico
+                    uint32_t MODE    : 2;  // Bits [2:1]: Función (00, 01, 10, 11)
+                    uint32_t INT_EN  : 1;  // Bit 3: Habilitar interrupción
+                    uint32_t RESERVED: 28; // Bits [31:4]: No utilizados
+                } bits;
+            } CR_Register_t;
+
+            void configurar_registro(void) {
+                volatile CR_Register_t *CR = (CR_Register_t *) 0x40002000U;
+
+                // Escritura directa en campos concretos sin alterar los demás
+                CR->bits.ENABLE = 1;
+                CR->bits.MODE   = 0b01;
+
+                // O bien modificación del registro completo en una sola operación
+                CR->raw = 0x0000000B;
+            }
+            \end{lstlisting}
+
+        \textbf{Advertencia sobre portabilidad:} La especificación del estándar \texttt{C} deja a criterio de la implementación del compilador la ordenación de los campos de bits (de LSB a MSB o viceversa) y el empaquetado en memoria. Además, modificar un campo de bits genera internamente una secuencia *Read-Modify-Write* no atómica, lo que puede derivar en condiciones de carrera si el registro es accedido simultáneamente por una ISR.
+
+    \subsection{Funciones \lstinline|static inline|}
+
+        A la hora de realizar operaciones frecuentemente repetidas (como por ejemplo activar o desactivar un pin de un periférico de GPIO), la aproximación tradicional ha sido la de definir macros parametrizadas mediante \lstinline|#define|. De esta forma, se evita la sobrecarga de llamar a una función específica, consistente en salvar registros en la pila, además de realizar el salto y retorno.
+
+        \begin{lstlisting}
+            #define TOGGLE_PIN_MACRO(port, pin)  ((port)->ODR ^= (1U << (pin)))
+
+            // Evaluacion con incremento: TOGGLE_PIN_MACRO(GPIOA, i) 
+            // expande a: (GPIOA)->ODR ^= (1U << (i))
+        \end{lstlisting}
+
+        Las macros, sin embargo, presentan algunos inconvenientes, especialmente cuando empieza a haber muchas: La trazabilidad se hace complicada, tanto en el desarrollo como en la depuración. Adicionalmente, los errores de sintaxis se hacen más comunes debido a las reglas de sustitución del preprocesador.
+
+        Como alternativa, disponemos de las funciones \lstinline|static inline|. La palabra clave \lstinline|inline| hace que el compilador reemplace la llamada a la función directamente por su código fuente el el punto de llamada. Por su parte, \lstinline|static| evita errores al incluir el archivo desde diferentes unidades de compilación.
+
+        \begin{lstlisting}
+            #include <stdint.h>
+
+            static inline void gpio_toggle_pin(GPIO_TypeDef *port, uint8_t pin) {
+                // Comprobación de tipos en compilación y sin efectos secundarios
+                port->ODR ^= (1U << pin); 
+            }
+        \end{lstlisting}
+
+        Así, se consigue la rapidez de las macros, añadiendo las comprobaciones extra del compilador y funciones de depuración estándar.
+
+
+
+\end{document}
+
+

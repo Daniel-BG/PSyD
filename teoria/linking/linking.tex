@@ -1,0 +1,231 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\section{El enlazado de programas e inicialización}
+
+    Para convertir varios archivos fuente compilados en un único ejecutable funcional, el enlazador (\emph{linker}) asigna direcciones físicas de memoria a cada instrucción y variable. Aunque para las instrucciones nos importa un poco menos, es importante asegurar que ciertos elementos de nuestro programa acaban en direcciones de memoria concretas. Por ejemplo, el código de arranque o ciertas funciones de interrupción (disparados ambos automáticamente) tendrán que estar en ubicaciones concretas. 
+
+    \subsection{El \emph{linker script}}
+
+        El \emph{linker script} (archivo con extensión \texttt{.ld}) es el documento de configuración que indica al enlazador cómo organizar la memoria del sistema. Cumple tres funciones principales: define las regiones de memoria física (utilización de Flash y RAM), ubica las diferentes secciones de código (variables/funciones) en ellas, y además permite exportar símbolos de dirección para que el propio código sepa dónde acaba ubicado.
+
+        Un mapa de memoria típico de ARM Cortex-M divide las secciones del programa en:
+
+        \begin{itemize}
+            \item \textbf{\texttt{.isr\_vector}:} Tabla de punteros con las llamadas a funciones de inicio e interrupciones.
+            \item \textbf{\texttt{.text}:} Código ejecutable e instrucciones del programa (almacenado en Flash).
+            \item \textbf{\texttt{.rodata}:} Constantes y cadenas de texto de solo lectura (almacenado en Flash).
+            \item \textbf{\texttt{.data}:} Variables globales e estáticas \emph{inicializadas} con un valor distinto de cero.
+            \item \textbf{\texttt{.bss}:} Variables globales e estáticas \emph{no inicializadas} (o inicializadas a cero).
+        \end{itemize}
+
+        \begin{lstlisting}
+            MEMORY
+            {
+                RAM (xrw)   : ORIGIN = 0x20000000, LENGTH = 256K
+                FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 512K
+            }
+
+            SECTIONS
+            {
+                /* Tabla de vectores al inicio de la Flash */
+                .isr_vector : {
+                    KEEP(*(.isr_vector))
+                } >FLASH
+
+                /* Código */
+                .text : {
+                    *(.text*)
+                    *(.rodata*)
+                    _etext = .; //símbolo exportado al final del código
+                } >FLASH
+
+                /* .rodata (constantes, strings, etc.) */
+                .rodata :
+                {
+                    *(.rodata)   
+                    *(.rodata*)       
+                } >FLASH
+
+                /* Datos inicializados, dirección de comienzo en FLASH */
+                _sidata = LOADADDR(.data); 
+
+                .data :
+                {
+                    _sdata = .;        /* Inicio de datos en RAM */
+                    *(.data)           /* .data sections */
+                    *(.data*)          /* .data* sections */
+                    _edata = .;        /* Fin de datos en RAM*/
+
+                } >RAM AT> FLASH /* Se guarda en RAM en ejecución, pero está en 
+                FLASH en compilación */
+
+                /* Datos sin inicializar van a RAM directamente */
+                .bss : {
+                    _sbss = .;
+                    *(.bss*)
+                    _ebss = .;
+                } > RAM
+
+                /* Definicion del tope de la pila al final de la RAM */
+                _estack = ORIGIN(RAM) + LENGTH(RAM);
+            }
+        \end{lstlisting}
+
+        Es importante diferenciar la \textbf{LMA} (\emph{Load Memory Address}) frente a \textbf{VMA} (\emph{Virtual Memory Address}). La sección \texttt{.data} reside físicamente en Flash (\textbf{LMA}) para no perder sus valores al apagar el chip, pero el procesador debe ejecutarla y modificarla desde la RAM (\textbf{VMA}). Este tipo de inicialización la hace el código de inicio.
+
+    \subsection{Código de inicio y salto a \lstinline|main|}
+
+        Cuando el microcontrolador recibe alimentación o se resetea, el procesador no ejecuta directamente la función \lstinline|main()|. En su lugar, el hardware lee la primera dirección de memoria y salta automáticamente al \lstinline|Reset_Handler|, definido en el archivo de ensamblador de arranque (\texttt{startup.s} o similar).
+
+        El \lstinline|Reset_Handler| realiza la inicialización básica del sistema en el siguiente orden estricto:
+
+        \begin{enumerate}
+            \item \textbf{Inicialización del Stack Pointer (SP):} Carga la dirección del puntero de pila principal con el símbolo \texttt{\_estack}.
+            \item \textbf{Llamada a \lstinline|SystemInit|:} Configura los relojes principales (\emph{clocks}) y la memoria Flash.
+            \item \textbf{Copia de la sección \texttt{.data}:} Lee el bloque de inicializadores desde la Flash (\texttt{\_sidata}) y los escribe en la RAM (desde \texttt{\_sdata} hasta \texttt{\_edata}).
+            \item \textbf{Limpieza de la sección \texttt{.bss}:} Rellena con ceros la región de RAM comprendida entre \texttt{\_sbss} y \texttt{\_ebss}.
+            \item \textbf{Llamada a constructores globales (\lstinline|__libc_init_array|):} Prepara librerías de C/C++.
+            \item \textbf{Salto a \lstinline|main()|:} Salta a la rutina principal de la aplicación. Si esta finaliza, entra en un bucle infinito de seguridad (\texttt{LoopForever}).
+        \end{enumerate}
+
+        \begin{lstlisting}
+            Reset_Handler:
+                ldr   r0, =_estack
+                mov   sp, r0          /* set stack pointer */
+                /* Call the clock system initialization function.*/
+                bl  SystemInit
+
+                /* Copy the data segment initializers from flash to SRAM */
+                ldr r0, =_sdata
+                ldr r1, =_edata
+                ldr r2, =_sidata
+                movs r3, #0
+                b LoopCopyDataInit
+
+            /***** Sección de copia de datos inicializados *****/
+            CopyDataInit:
+                ldr r4, [r2, r3]
+                str r4, [r0, r3]
+                adds r3, r3, #4
+
+            LoopCopyDataInit:
+                adds r4, r0, r3
+                cmp r4, r1
+                bcc CopyDataInit
+
+            /***** Sección de inicialización con ceros de .bss *****/
+                ldr r2, =_sbss
+                ldr r4, =_ebss
+                movs r3, #0
+                b LoopFillZerobss
+
+            FillZerobss:
+                str  r3, [r2]
+                adds r2, r2, #4
+
+            LoopFillZerobss:
+                cmp r2, r4
+                bcc FillZerobss
+
+            /***** Inicialización de librerías *****/
+                bl __libc_init_array
+            
+            /***** Salto al programa principal *****/
+                bl main
+
+            LoopForever:
+                b LoopForever
+        \end{lstlisting}
+
+    \subsection{La tabla de vectores}
+
+        La arquitectura ARM Cortex-M requiere que las direcciones de las funciones de atención a excepciones e interrupciones estén organizadas en una posición fija de memoria, conocida como \textbf{Tabla de Vectores}. Por defecto, se ubica al principio de la memoria Flash (\texttt{0x08000000}).
+
+        Cada entrada de la tabla es una palabra de 32 bits que contiene la dirección de memoria de la rutina correspondiente:
+
+        \begin{itemize}
+            \item \textbf{Offset \texttt{0x00}:} Puntero inicial de la pila (\texttt{\_estack}).
+            \item \textbf{Offset \texttt{0x04}:} Dirección del \lstinline|Reset_Handler|.
+            \item \textbf{Offset \texttt{0x08} a \texttt{0x3C}:} Excepciones del núcleo Cortex (NMI, HardFault, SysTick, etc.).
+            \item \textbf{Offset \texttt{0x40} en adelante:} Interrupciones de periféricos propios del fabricante (USART, TIM, DMA, etc.).
+        \end{itemize}
+
+        \begin{lstlisting}
+            .section .isr_vector,"a",%progbits
+            .type g_pfnVectors, %object
+
+            g_pfnVectors:
+            .word _estack                 /* 0x00: Pila inicial */
+            .word Reset_Handler           /* 0x04: Reset Handler */
+            .word NMI_Handler             /* 0x08: NMI Handler */
+            .word HardFault_Handler       /* 0x0C: HardFault Handler */
+            /* ... Excepciones del nucleo ... */
+            .word SysTick_Handler         /* 0x3C: Timer del sistema */
+            
+            /* Interrupciones de perifericos externos */
+            .word WWDG_IRQHandler
+            .word USART1_IRQHandler
+            .word EXTI0_IRQHandler
+        \end{lstlisting}
+
+        Podemos observar que esta sección (\texttt{.isr\_vector}) es la que colocaba anteriormente el \emph{linker script} al principio exacto de la \textbf{FLASH}, para así ubicar todos estos símbolos en las posiciones adecuadas.
+
+        \subsubsection{El modificador \emph{weak}}
+
+            En el archivo de arranque, todas las interrupciones se enlazan por defecto a una rutina genérica llamada \lstinline|Default_Handler| (que ejecuta un bucle infinito) mediante el atributo de ensamblador \texttt{.weak} (o \texttt{\_\_attribute\_\_((weak))} en C).
+
+            El modificador \emph{weak} (débil) indica al enlazador que use esa definición por defecto únicamente si el usuario no ha definido una función con el mismo nombre en su código C. 
+
+            \begin{lstlisting}
+                .weak USART1_IRQHandler
+                .thumb_set USART1_IRQHandler, Default_Handler
+            \end{lstlisting}
+
+            Si el desarrollador escribe en su archivo \texttt{main.c}:
+
+            \begin{lstlisting}
+                void USART1_IRQHandler(void) {
+                    // Codigo propio para procesar la recepcion de datos
+                }
+            \end{lstlisting}
+
+            El enlazador sustituye automáticamente la dirección del \lstinline|Default_Handler| por la dirección de esta nueva función dentro de la tabla de vectores, sin necesidad de modificar el archivo de ensamblador original.
+
+        \subsubsection{Interrupciones y compartición de memoria}
+
+            Cuando salta una interrupción, el hardware del procesador suspende la ejecución del hilo principal (\lstinline|main|), guarda automáticamente el contexto (registros \texttt{R0-R3}, \texttt{R12}, \texttt{LR}, \texttt{PC}, \texttt{xPSR}) en la pila y salta a la ISR asignada en la tabla de vectores.
+
+            Al compartir variables entre el hilo principal y una rutina de interrupción, surgen problemas de inconsistencia de datos y condiciones de carrera:
+
+            \begin{itemize}
+                \item \textbf{Uso obligatorio de \lstinline|volatile|:} Evita que el compilador almacene en registros de la CPU el valor de una variable que puede ser alterada por la ISR en cualquier momento.
+                \item \textbf{Operaciones no atómicas:} Si el hilo principal modifica una variable de 32 bits mientras ocurre una interrupción a mitad del proceso de escritura, la ISR leerá datos corruptos.
+            \end{itemize}
+
+            \begin{lstlisting}
+                #include <stdint.h>
+
+                volatile uint32_t contador_eventos = 0;
+
+                void TIM2_IRQHandler(void) {
+                    // esta función se ejecuta automáticamente cuando hay interrupción
+                    contador_eventos++; 
+                }
+
+                uint32_t leer_contador_seguro(void) {
+                    uint32_t copia;
+
+                    // Desactivar interrupciones antes de leer
+                    __asm volatile ("cpsid i" : : : "memory");
+                    copia = contador_eventos; // Lectura protegida
+                    // Reactiva interrupciones tras leer
+                    __asm volatile ("cpsie i" : : : "memory");
+
+                    return copia;
+                }
+            \end{lstlisting}
+
+
+\end{document}

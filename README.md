@@ -3,7 +3,9 @@
 Bienvenido al sitio web del material de la asignatura de Programación de Sistemas y Dispositivos, del grado en Ingeniería de Computadores en la UCM. Desde aquí puedes acceder a todos los recursos.
 
 ## 📖 Teoría
-* 📄 Integrada en las prácticas
+* 📄 [Alto nivel a memoria física](teoria/c_to_physical/c_to_physical.pdf)
+* 📄 [Estructuras y definiciones hardware](teoria/hardware_structs/hardware_structs.pdf)
+* 📄 [Enlazado e inicialización](teoria/linking/linking.pdf)
 
 ## 🛠️ Prácticas
 * 📁 [Punto de entrada a las prácticas](practicas/practicas.md)
