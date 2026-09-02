@@ -193,39 +193,4 @@
 
             El enlazador sustituye automáticamente la dirección del \lstinline|Default_Handler| por la dirección de esta nueva función dentro de la tabla de vectores, sin necesidad de modificar el archivo de ensamblador original.
 
-        \subsubsection{Interrupciones y compartición de memoria}
-
-            Cuando salta una interrupción, el hardware del procesador suspende la ejecución del hilo principal (\lstinline|main|), guarda automáticamente el contexto (registros \texttt{R0-R3}, \texttt{R12}, \texttt{LR}, \texttt{PC}, \texttt{xPSR}) en la pila y salta a la ISR asignada en la tabla de vectores.
-
-            Al compartir variables entre el hilo principal y una rutina de interrupción, surgen problemas de inconsistencia de datos y condiciones de carrera:
-
-            \begin{itemize}
-                \item \textbf{Uso obligatorio de \lstinline|volatile|:} Evita que el compilador almacene en registros de la CPU el valor de una variable que puede ser alterada por la ISR en cualquier momento.
-                \item \textbf{Operaciones no atómicas:} Si el hilo principal modifica una variable de 32 bits mientras ocurre una interrupción a mitad del proceso de escritura, la ISR leerá datos corruptos.
-            \end{itemize}
-
-            \begin{lstlisting}
-                #include <stdint.h>
-
-                volatile uint32_t contador_eventos = 0;
-
-                void TIM2_IRQHandler(void) {
-                    // esta función se ejecuta automáticamente cuando hay interrupción
-                    contador_eventos++; 
-                }
-
-                uint32_t leer_contador_seguro(void) {
-                    uint32_t copia;
-
-                    // Desactivar interrupciones antes de leer
-                    __asm volatile ("cpsid i" : : : "memory");
-                    copia = contador_eventos; // Lectura protegida
-                    // Reactiva interrupciones tras leer
-                    __asm volatile ("cpsie i" : : : "memory");
-
-                    return copia;
-                }
-            \end{lstlisting}
-
-
 \end{document}

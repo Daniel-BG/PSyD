@@ -1,0 +1,125 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\section{Interrupciones, sincronización y \emph{callbacks}}
+
+    Cuando salta una interrupción (cuya dirección está almacenada en la tabla de vectores), el hardware del procesador suspende la ejecución del hilo principal (\lstinline|main|), guarda automáticamente el contexto (registros \texttt{R0-R3}, \texttt{R12}, \texttt{LR}, \texttt{PC}, \texttt{xPSR}) en la pila y salta a la ISR asignada en la tabla de vectores.
+
+    Al compartir variables entre el hilo principal y una rutina de interrupción, surgen problemas de inconsistencia de datos y condiciones de carrera:
+
+    \begin{itemize}
+        \item \textbf{Uso obligatorio de \lstinline|volatile|:} Evita que el compilador almacene en registros de la CPU el valor de una variable que puede ser alterada por la ISR en cualquier momento.
+        \item \textbf{Operaciones no atómicas:} Si el hilo principal modifica una variable de 32 bits mientras ocurre una interrupción a mitad del proceso de escritura, la ISR leerá datos corruptos.
+    \end{itemize}
+
+    \begin{lstlisting}
+        #include <stdint.h>
+
+        volatile uint32_t contador_eventos = 0;
+
+        void TIM2_IRQHandler(void) {
+            // esta función se ejecuta automáticamente cuando hay interrupción
+            contador_eventos++; 
+        }
+
+        uint32_t leer_contador_seguro(void) {
+            uint32_t copia;
+
+            // Desactivar interrupciones antes de leer
+            __asm volatile ("cpsid i" : : : "memory");
+            copia = contador_eventos; // Lectura protegida
+            // Reactiva interrupciones tras leer
+            __asm volatile ("cpsie i" : : : "memory");
+
+            return copia;
+        }
+    \end{lstlisting}
+
+    \subsection{Barreras de memoria}
+
+        El código \texttt{C} mantiene un orden lógico. Sin embargo, las optimizaciones del compilador, y el reordenamiento dinámico de instrucciones que sucede a nivel arquitectural, pueden cambiar dicho orden, a fin de mejorar el rendimiento. Esto siempre se hace de tal manera que el resultado final es el mismo, siempre y cuando no haya modificaciones externas de los valores implicados. ¿Y qué pasa con un sistema empotrado con periféricos mapeados en memoria? Pues que puede haber modificaciones externas.
+
+        En ciertos momentos, querremos obligar al procesador a completar las operaciones de memoria antes de continuar. Para ello, la arquitectura ARM Cortex-M provee tres instrucciones de barrera de memoria:
+
+        \begin{itemize}
+            \item \textbf{\lstinline|__DMB()| (Data Memory Barrier):} Garantiza que todas las accesos a memoria (lecturas y escrituras) previos a la barrera se hayan completado antes de que se inicie cualquier acceso a memoria posterior. No frena la ejecución de instrucciones que no accedan a memoria.
+                \begin{lstlisting}
+                    __attribute__((always_inline)) static inline void __DSB(void) {
+                        __asm volatile ("dsb 0xF":::"memory");
+                    }
+                \end{lstlisting}    
+
+            \item \textbf{\lstinline|__DSB()| (Data Synchronization Barrier):} Detiene la ejecución de \textbf{todas} las instrucciones hasta que las operaciones de acceso a memoria pendientes hayan finalizado.
+                \begin{lstlisting}
+                    __attribute__((always_inline)) static inline void __DMB(void) {
+                        __asm volatile ("dmb 0xF":::"memory");
+                    }
+                \end{lstlisting}
+
+            \item \textbf{\lstinline|__ISB()| (Instruction Synchronization Barrier):} Completa todas las instrucciones pendientes del procesador y fuerza a volver a cargar las instrucciones desde memoria o caché. Se utiliza tras modificar la configuración del sistema (como el mapa de memoria o la MPU) para evitar mantener valores antiguos.
+                \begin{lstlisting}
+                    __attribute__((always_inline)) static inline void __ISB(void) {
+                        __asm volatile ("isb 0xF":::"memory");
+                    }
+                \end{lstlisting}
+        \end{itemize}
+
+        Generalmente, los manuales de uso nos indicarán cuándo es necesario utilizar una de estas barreras al interactuar con los diferentes periféricos y elementos del procesador. 
+
+        Un caso de uso de \lstinline|__DSB()| en microcontroladores ocurre al limpiar bits de interrupción en una ISR. Debido al tiempo que tarda el bus en procesar la escritura en el periférico (potencialmente miles de ciclos si el reloj del periférico es muy lento), la CPU podría salir de la ISR antes de que la bandera se limpie físicamente en el registro, re-disparando la misma interrupción. 
+
+        \begin{lstlisting}
+            void EXTI0_IRQHandler(void) {
+                // ... gestión de ISR
+
+                // ... limpieza de bits
+                EXTI->PR = EXTI_PR_PR0;
+                // ... garantizamos que se haya escrito antes de salir
+                __DSB();
+            }
+        \end{lstlisting}
+
+    \subsection{Punteros a función y Callbacks}
+
+        Para mantener un diseño de software modular, la capa que interactúa directamente con el hardware (\emph{drivers}) no debe contener lógica de aplicación. El mecanismo estándar para notificar eventos desde dichos \emph{drivers} (o una ISR) hacia la aplicación es la utilización de \textbf{punteros a función}. Esta técnica se conoce comúnmente como \emph{callbacks}, ya que la función \emph{hardware} hará una llamada (\emph{callback}) a nuestra función con lógica.
+
+        Un puntero a función almacena la dirección de memoria donde está situada, permitiendo su invocación dinámica en tiempo de ejecución.
+
+        \begin{lstlisting}
+            #include <stddef.h>
+            #include <stdint.h>
+
+            // Definición del tipo de puntero a función 
+            // Será una función que no devuelve nada (void)
+            // Y que recibe un argumento tipo uint16_t
+            typedef void (*gpio_callback_t)(uint16_t pin);
+
+            // Variable del driver para almacenar el callback
+            static gpio_callback_t exti0_user_callback = NULL;
+
+            // Función de la API pública para registrar el callback 
+            // desde el código de aplicación (p.ej: main.c)
+            void gpio_register_callback(gpio_callback_t callback) {
+                exti0_user_callback = callback;
+            }
+
+            // Manejador de la interrupción del hardware
+            void EXTI0_IRQHandler(void) {
+                // ... procesamiento de ISR
+                uint16_t pin = ...;
+
+                // limpieza de bits de interrupción
+                EXTI->PR = EXTI_PR_PR0;
+                __DSB();
+
+                // Llamada al callback
+                if (exti0_user_callback != NULL) {
+                    exti0_user_callback(pin); 
+                    // Ejecuta la función de la capa de aplicación
+                    // avisando del estado (en este caso el pin)
+                }
+            }
+        \end{lstlisting}
+
+\end{document}
