@@ -99,31 +99,40 @@
 
         \textbf{Advertencia sobre portabilidad:} La especificación del estándar \texttt{C} deja a criterio de la implementación del compilador la ordenación de los campos de bits (de LSB a MSB o viceversa) y el empaquetado en memoria. Además, modificar un campo de bits genera internamente una secuencia *Read-Modify-Write* no atómica, lo que puede derivar en condiciones de carrera si el registro es accedido simultáneamente por una ISR.
 
-    \subsection{Funciones \lstinline|static inline|}
+    \subsection{Palabra clave \lstinline|static|}
+        
+        La palabra clave \lstinline|static| tiene dos usos principales en \texttt{C}:
 
-        A la hora de realizar operaciones frecuentemente repetidas (como por ejemplo activar o desactivar un pin de un periférico de GPIO), la aproximación tradicional ha sido la de definir macros parametrizadas mediante \lstinline|#define|. De esta forma, se evita la sobrecarga de llamar a una función específica, consistente en salvar registros en la pila, además de realizar el salto y retorno.
+        \begin{enumerate}
+            \item Hacer que una variable, dentro de una función, retenga el valor entre llamadas. Aunque no le daremos este uso durante el curso, conviene saberlo.
+            \item Hacer que una variable o función sólo sea vista dentro de la unidad de compilación a la que pertenece. Así, esas variables o funciones no pueden ser vistas por otras unidades de compilación (normalmente archivos .c), y evitamos colisiones de nombres.
+        \end{enumerate}
 
-        \begin{lstlisting}
-            #define TOGGLE_PIN_MACRO(port, pin)  ((port)->ODR ^= (1U << (pin)))
+        \subsubsection{Funciones \lstinline|static inline|}
 
-            // Evaluacion con incremento: TOGGLE_PIN_MACRO(GPIOA, i) 
-            // expande a: (GPIOA)->ODR ^= (1U << (i))
-        \end{lstlisting}
+            A la hora de realizar operaciones frecuentemente repetidas (como por ejemplo activar o desactivar un pin de un periférico de GPIO), la aproximación tradicional ha sido la de definir macros parametrizadas mediante \lstinline|#define|. De esta forma, se evita la sobrecarga de llamar a una función específica, consistente en salvar registros en la pila, además de realizar el salto y retorno.
 
-        Las macros, sin embargo, presentan algunos inconvenientes, especialmente cuando empieza a haber muchas: La trazabilidad se hace complicada, tanto en el desarrollo como en la depuración. Adicionalmente, los errores de sintaxis se hacen más comunes debido a las reglas de sustitución del preprocesador.
+            \begin{lstlisting}
+                #define TOGGLE_PIN_MACRO(port, pin)  ((port)->ODR ^= (1U << (pin)))
 
-        Como alternativa, disponemos de las funciones \lstinline|static inline|. La palabra clave \lstinline|inline| hace que el compilador reemplace la llamada a la función directamente por su código fuente el el punto de llamada. Por su parte, \lstinline|static| evita errores al incluir el archivo desde diferentes unidades de compilación.
+                // Evaluacion con incremento: TOGGLE_PIN_MACRO(GPIOA, i) 
+                // expande a: (GPIOA)->ODR ^= (1U << (i))
+            \end{lstlisting}
 
-        \begin{lstlisting}
-            #include <stdint.h>
+            Las macros, sin embargo, presentan algunos inconvenientes, especialmente cuando empieza a haber muchas: La trazabilidad se hace complicada, tanto en el desarrollo como en la depuración. Adicionalmente, los errores de sintaxis se hacen más comunes debido a las reglas de sustitución del preprocesador.
 
-            static inline void gpio_toggle_pin(GPIO_TypeDef *port, uint8_t pin) {
-                // Comprobación de tipos en compilación y sin efectos secundarios
-                port->ODR ^= (1U << pin); 
-            }
-        \end{lstlisting}
+            Como alternativa, disponemos de las funciones \lstinline|static inline|. La palabra clave \lstinline|inline| hace que el compilador reemplace la llamada a la función directamente por su código fuente el el punto de llamada. Por su parte, \lstinline|static|, como ya decíamos, hace que la función no sea vista fuera de la unidad de compilación, así que aunque la incluyamos desde numerosos archivos \texttt{.c}, evitaremos errores de duplicidad al compilar.
 
-        Así, se consigue la rapidez de las macros, añadiendo las comprobaciones extra del compilador y funciones de depuración estándar.
+            \begin{lstlisting}
+                #include <stdint.h>
+
+                static inline void gpio_toggle_pin(GPIO_TypeDef *port, uint8_t pin) {
+                    // Comprobación de tipos en compilación y sin efectos secundarios
+                    port->ODR ^= (1U << pin); 
+                }
+            \end{lstlisting}
+
+            Así, se consigue la rapidez de las macros, añadiendo las comprobaciones extra del compilador y funciones de depuración estándar.
 
 
 

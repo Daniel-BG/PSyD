@@ -175,6 +175,15 @@
         \label{fig:tabla_memoria_puntero_led}
         \end{figure}
 
+        \textbf{NOTA:} Si hablamos de punteros, no podemos dejar de lado (aunque no se utilice habitualmente) el operador \lstinline|&|. Este operador sirve para darnos la \emph{dirección} de una variable. Así, podremos establecer punteros a direcciones concretas donde tenemos almacenados datos:
+    
+        \begin{lstlisting}
+            uint32_t    a;
+            uint32_t* ptr;
+             ptr = &a; //guardamos dirección de 'a' en el puntero
+            *ptr = 20; //modificamos 'a' directamente
+        \end{lstlisting}
+
 
     \subsection{Las operaciones bit a bit - manipulación de registros}
 
