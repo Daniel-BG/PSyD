@@ -6,7 +6,7 @@
 
     Las prácticas de la asignatura de PSyD se desarrollan en un entorno ya preparado dentro de una máquina virtual. Esto es debido a la comodidad y portabilidad que ofrece, ya que con trasladar un simple fichero, cualquiera puede tener todas las herramientas disponibles en su ordenador. No obstante, también se ofrece aquí una guía de instalación para quien quiera instalarlo todo de manera nativa en su ordenador. La guía se ha realizado para Ubuntu. Su adaptación a otros sistemas operativos (MacOS, o Windows) es relativamente directa, al estar las herramientas disponibles para todas las plataformas. 
 
-    \subsection{Configuración para máquina virtual}\label{}
+    \subsection{Configuración para máquina virtual}\label{sub:vmconfig}
         El software y los recursos necesarios ya están preinstalados en una máquina virtual basada en \textbf{Debian 13.6}. Cuenta con un entorno ligero (gestor de ventanas, navegador básico) y las \textbf{VirtualBox Guest Additions} para habilitar el passthrough de dispositivos USB (necesario para conectar la placa).
 
         Puedes descargar la máquina virtual ya configurada y lista para importar en VirtualBox desde \url{https://drive.google.com/file/d/1U7Qvnkb-LfkJrcboyH4Jzs9iNczMntQg/view?usp=drivesdk}. También es necesario descargar \textbf{VirtualBox} para arrancarla. Para ello sigue las siguientes instrucciones:
@@ -177,7 +177,9 @@
             \label{fig:after_import}
         \end{figure}
     
+    \subsection{Conexión de la placa a la máquina virtual}
 
+        Si utilizas tu ordenador con STM32CubeIDE instalado nativamente, la placa debería detectarse automáticamente por el programa. Si usas la máquina virtual, hace falta indicarle al ordenador que pase el control del USB del sistema operativo anfitrión (el vuestro) al huésped (la máquina virtual). Para ello, con la máquina virtual ya abierta, seleccionar en el menú \texttt{devices > USB > ST-LINK} y activarlo.
 
 
 \end{document}
