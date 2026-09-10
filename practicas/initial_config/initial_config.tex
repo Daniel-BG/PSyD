@@ -6,7 +6,7 @@
 
     Las prácticas de la asignatura de PSyD se desarrollan en un entorno ya preparado dentro de una máquina virtual. Esto es debido a la comodidad y portabilidad que ofrece, ya que con trasladar un simple fichero, cualquiera puede tener todas las herramientas disponibles en su ordenador. No obstante, también se ofrece aquí una guía de instalación para quien quiera instalarlo todo de manera nativa en su ordenador. La guía se ha realizado para Ubuntu. Su adaptación a otros sistemas operativos (MacOS, o Windows) es relativamente directa, al estar las herramientas disponibles para todas las plataformas. 
 
-    \subsection{Paso 1: Configuración para máquina virtual}
+    \subsection{Configuración para máquina virtual}\label{}
         El software y los recursos necesarios ya están preinstalados en una máquina virtual basada en \textbf{Debian 13.6}. Cuenta con un entorno ligero (gestor de ventanas, navegador básico) y las \textbf{VirtualBox Guest Additions} para habilitar el passthrough de dispositivos USB (necesario para conectar la placa).
 
         Puedes descargar la máquina virtual ya configurada y lista para importar en VirtualBox desde \url{https://drive.google.com/file/d/1U7Qvnkb-LfkJrcboyH4Jzs9iNczMntQg/view?usp=drivesdk}. También es necesario descargar \textbf{VirtualBox} para arrancarla. Para ello sigue las siguientes instrucciones:
@@ -16,7 +16,7 @@
             \item Importante también descargar, desde el mismo enlace, el ``VirtualBox Extension Pack''. Sin él, perderemos funcionalidades de la MV, entre otros, la capacidad de conectarle USBs (como el depurador ST-Link de la placa).
         \end{itemize}
 
-    \subsection{Paso 2: Creación de la Máquina Virtual}
+    \subsection{Creación de la Máquina Virtual}
         Sigue esta parte sólo si quieres crear una máquina virtual propia desde cero. Si quieres hacerlo de manera nativa, salta a \Cref{sub:toolkitsetup}.
 
         Crea una nueva máquina virtual e instala \textbf{Debian} en su última versión (\url{https://www.debian.org/index.es.html}) o \textbf{Ubuntu} (recomendado versión \textbf{24.04 LTS}, descargable desde \url{https://ubuntu.com/download}). Configura el hardware asignándole los siguientes recursos recomendados:
@@ -42,8 +42,8 @@
         \end{lstlisting}
 
 
-    \subsection{Paso 3: Configuración del ToolKit de STM}\label{sub:toolkitsetup}
-        Independientemente de si quieres utilizar tu propio sistema operativo para instalar las herramientas, o instalarlas en la máquina virtual, se hace de la misma manera. A continuación se muestran todas las herramientas, repositorios, etc necesarios para tener todo lo necesario en la asignatura. Si prefieres no realizar la instalación, descarga la máquina virtual ya configurada como se indica en el primer paso.
+    \subsection{Configuración del ToolKit de STM}\label{sub:toolkitsetup}
+        Independientemente de si quieres utilizar tu propio sistema operativo para instalar las herramientas, o instalarlas en la máquina virtual, se hace de la misma manera. A continuación se muestran todas las herramientas, repositorios, etc necesarios para tener todo lo necesario en la asignatura. Si prefieres no realizar la instalación, descarga la máquina virtual ya configurada como se indica en el primer paso (\Cref{sub:vmconfig}).
 
         \begin{itemize}
             \item Instalar STM32CubeIDE (la herramienta principal de desarrollo) desde aquí: \url{https://www.st.com/en/development-tools/stm32cubeide.html}
@@ -55,7 +55,7 @@
                 \end{lstlisting}
         \end{itemize}
 
-    \subsection{Paso 4: Descarga de manuales y recursos extra}
+    \subsection{Descarga de manuales y recursos extra}
         Dentro de la MV ya creada, en la carpeta \textbf{Documentos} del entorno se encuentran varios recursos en forma de manuales. Si se está haciendo la instalación manual, estos son los recursos que ahí se encuentran y haría falta descargar:
 
         \begin{itemize}
@@ -103,6 +103,82 @@
 
                 Parche que se debe sobrescribir en el repositorio una vez clonado. Añade librerías propietarias de terceros necesarias para funciones como el control táctil o el procesamiento de audio.
         \end{itemize}
+
+    \subsection{Descarga del material de la asignatura}
+
+        El material de la asignatura se encuentra completo en \url{https://github.com/Daniel-BG/PSyD}, incluyendo teoría, práctica y códigos de ejemplo. Se recomienda descargarlo entero mediante la herramienta de terminal \texttt{git} (o cualquier otra herramienta que permita descargar repositorios). Desde la terminal de la máquina virtual (o la terminal nativa de tu ordenador), ejecuta:
+
+        \begin{lstlisting}
+            > git clone https://github.com/Daniel-BG/PSyD
+        \end{lstlisting}
+
+        \textbf{NOTA:} Si la herramienta \texttt{git} no estuviera disponible, en linux se puede instalar con:
+
+        \begin{lstlisting}
+            >  sudo apt-get install git
+        \end{lstlisting}
+
+        Se descargará y creará una carpeta llamada \texttt{PSyD}, con los siguientes contenidos:
+
+        \definecolor{doccomment}{rgb}{0.4, 0.8, 0.4}
+        \newcommand{\grcomment}[1]{\DTcomment{\textcolor{doccomment}{-- #1}}}
+
+        \dirtree{%
+            .1 code/\grcomment{Código fuente de las prácticas}.
+                .2 ws\_desarrollo/\grcomment{Proyectos SIN solución (punto de partida)}.
+                    .3 <nombre\_practica>/\grcomment{Ficheros de proyecto STM32/CubeIDE}.
+                .2 ws\_soluciones/\grcomment{Proyectos CON solución (para consulta)}.
+                    .3 <nombre\_practica>/\grcomment{Misma estructura resuelta}.
+            .1 practicas/\grcomment{Enunciados y documentación}.
+                .2 main.\{pdf,tex\}\grcomment{Compilación completa de prácticas}.
+                .2 practicas.md\grcomment{Información general}.
+                .2 <nombre\_practica>/\grcomment{Carpeta individual por práctica}.
+                    .3 <nombre\_practica>.\{pdf,tex\}\grcomment{Enunciado en fuente y renderizado}.
+                    .3 res/\grcomment{Recursos gráficos e imágenes}.
+            .1 teoria/\grcomment{Material teórico}.
+                .2 main.\{pdf,tex\}\grcomment{Libro/Documento completo de teoría}.
+                .2 <capitulo>/\grcomment{Capítulo individual}.
+                    .3 <capitulo>.\{pdf,tex\}\grcomment{Fuente y PDF del capítulo}.
+        }
+
+        Ahora, abriendo la herramienta STM32CubeIDE, podremos importar los proyectos. En primer lugar debemos establecer como \emph{workspace} la carpeta donde tenemos los códigos. Por ejemplo vamos a hacerlo con \texttt{ws\_desarrollo}, como se ve en la \Cref{fig:ws_import}.
+
+        \begin{figure}
+            \centering
+            \includegraphics[width=0.6\textwidth]{res/ws_import.png}
+            \caption{Elección de la carpeta para importar}
+            \label{fig:ws_import}
+        \end{figure}
+
+        A continuación, haremos click en \texttt{file > STM32 Project create/import} para abrir la herramienta de importación, seleccionándola desde el menú que se abre (\Cref{fig:import_project}).
+
+        \begin{figure}
+            \centering
+            \includegraphics[width=0.6\textwidth]{res/import_project.png}
+            \caption{Elegir importación de proyectos}
+            \label{fig:import_project}
+        \end{figure}
+
+        Finalmente, buscamos de nuevo la carpeta del workspace (que es donde están los proyectos) y la elegimos en el menú. Esto nos mostrará los proyectos, y podemos elegir cuáles importar (si alguno no se importa ahora, se puede hacer más tarde). Ver la \Cref{fig:import_dialog}.
+
+        \begin{figure}
+            \centering
+            \includegraphics[width=\textwidth]{res/import_dialog.png}
+            \caption{Elegir importación de proyectos}
+            \label{fig:import_dialog}
+        \end{figure}
+
+        Tras importar los proyectos, los deberíamos ver en el panel lateral de la herramienta, ver \Cref{fig:after_import}.
+
+        \begin{figure}
+            \centering
+            \includegraphics[width=\textwidth]{res/after_import.png}
+            \caption{Elegir importación de proyectos}
+            \label{fig:after_import}
+        \end{figure}
+    
+
+
 
 \end{document}
 
