@@ -104,7 +104,7 @@
                 Parche que se debe sobrescribir en el repositorio una vez clonado. Añade librerías propietarias de terceros necesarias para funciones como el control táctil o el procesamiento de audio.
         \end{itemize}
 
-    \subsection{Descarga del material de la asignatura}
+    \subsection{Descarga del material de la asignatura}\label{sub:download}
 
         El material de la asignatura se encuentra completo en \url{https://github.com/Daniel-BG/PSyD}, incluyendo teoría, práctica y códigos de ejemplo. Se recomienda descargarlo entero mediante la herramienta de terminal \texttt{git} (o cualquier otra herramienta que permita descargar repositorios). Desde la terminal de la máquina virtual (o la terminal nativa de tu ordenador), ejecuta:
 
@@ -177,10 +177,21 @@
             \label{fig:after_import}
         \end{figure}
     
-    \subsection{Conexión de la placa a la máquina virtual}
+    \subsection{Conexión de la placa a la máquina virtual}\label{sub:boardconnect}
 
         Si utilizas tu ordenador con STM32CubeIDE instalado nativamente, la placa debería detectarse automáticamente por el programa. Si usas la máquina virtual, hace falta indicarle al ordenador que pase el control del USB del sistema operativo anfitrión (el vuestro) al huésped (la máquina virtual). Para ello, con la máquina virtual ya abierta, seleccionar en el menú \texttt{devices > USB > ST-LINK} y activarlo.
 
+    \subsection{Uso en los laboratorios de la facultad}
+
+        En los laboratorios de la facultad, la máquina está instalada en \textbf{Linux}, por tanto el primer paso es entrar en ese sistema operativo (si está arrancado en windows, tienes que reiniciar el ordenador, y elegir Linux al arrancar). Una vez dentro, hay varios usuarios, elige el \textbf{usuario} normal, NO el de VMs. Ya iniciada la sesión, tendrás que abrir una terminal, y para lanzar la máquina escribir:
+
+        \begin{lstlisting}[language=bash]
+            > VM_PsyD_debian.sh
+            # si no sale el nombre exactamente igual, escribir solo VM
+            # en la terminal y pulsar "tab" para ver las opciones disponibles
+        \end{lstlisting}
+
+        Tras esto, se lanzará la máquina virtual con las herramientas. A continuación puedes abrir otra terminal dentro, y en el directorio de tu elección (Se recomienda la carpeta \texttt{Documentos}), descargar el repositorio con el contenido de la asignatura siguiendo el \Cref{sub:download}. Finalmente, para conectar la placa, sigue el \Cref{sub:boardconnect}.
 
 \end{document}
 
