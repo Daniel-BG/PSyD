@@ -1,0 +1,127 @@
+% Definimos el comando \pendientes con texto rojo y fondo negro
+\newcommand{\pendiente}[1]{\colorbox{black}{\textcolor{red}{\textbf{#1}}}}
+
+
+%%%% HIGHLIGHTS %%%%%
+% Define colors
+\definecolor{lightyellow}{HTML}{FFFFF4} % Ultra-faint, subtle warm yellow background
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codeblue}{rgb}{0.1,0.1,0.7}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{codegreen}{rgb}{0.0,0.5,0.0} % Dark green for clean legibility
+
+\lstset{
+    language=C,
+    autogobble=true,
+    backgroundcolor=\color{lightyellow}, % Very faint background
+    basicstyle=\ttfamily\footnotesize,
+    numbers=left,
+    numberstyle=\tiny\color{codegray},
+    stepnumber=1,
+    numbersep=10pt,
+    keywordstyle=\color{codeblue}\bfseries,
+    commentstyle=\color{codegreen}, % Green comments
+    stringstyle=\color{codepurple},
+    breaklines=true,
+    showstringspaces=false,
+    tabsize=4,
+    frame=single,
+    rulecolor=\color{gray!25},
+    framesep=4pt,
+    % --- Spanish character support (utf-8 / pdflatex) ---
+    inputencoding=utf8,
+    extendedchars=true,
+    literate=
+      {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+      {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+      {ñ}{{\~n}}1 {Ñ}{{\~N}}1 {¿}{{{\textquestiondown}}}1 {¡}{{{\textexcldown}}}1
+}
+
+%%%%%%Comandos para referencias y demás del procesador
+
+% --- Paleta de Colores Unificada ---
+\definecolor{refbg}{HTML}{E8F2FF}     % Azul claro (Manuales de referencia)
+\definecolor{reftext}{HTML}{0055B8}
+
+\definecolor{brdbg}{HTML}{EBF9F5}     % Verde menta suave (Manuales de placa)
+\definecolor{brdtext}{HTML}{007A5E}
+
+\definecolor{dsbg}{HTML}{FBE9F5}     % Morado suave (Datasheet del procesador)
+\definecolor{dstext}{HTML}{7A005E}
+
+\definecolor{pmbg}{HTML}{FBE9E5}     % Rojo suave (Datasheet del procesador)
+\definecolor{pmtext}{HTML}{7A0000}
+
+\definecolor{lcdbg}{HTML}{EBF9E5}     % Verde amarillento ? (LCD)
+\definecolor{lcdtext}{HTML}{7A008B}
+
+\definecolor{regbg}{HTML}{FFF4E5}     % Naranja suave (Registros)
+\definecolor{regtext}{HTML}{B85B00}
+
+\definecolor{perbg}{HTML}{F4F4E5}     % Amarillo suave (Registros)
+\definecolor{pertext}{HTML}{7A7A00}
+
+\definecolor{anbg}{HTML}{F5EBE6}    % Marrón café suave 
+\definecolor{antext}{HTML}{5A2A00}
+
+\definecolor{membg}{HTML}{F3F4F6}     % Gris técnico (Direcciones de memoria)
+\definecolor{memtext}{HTML}{1F2937}
+
+% --- Comando Base para "Burbujas/Badges" ---
+\newcommand{\codebubble}[3]{%
+  \tcbox[
+    on line,
+    arc=4pt,
+    outer arc=4pt,
+    colback=#1,
+    colframe=#1,
+    coltext=#2,
+    boxsep=0pt, left=5pt, right=5pt, top=2pt, bottom=2pt,
+    boxrule=0pt
+  ]{\small\texttt{#3}}%
+}
+
+% --- Comandos genéricos por si se cambia algo ---
+\newcommand{\REFMAN}[1][]{%
+  \codebubble{refbg}{reftext}{rm0431\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
+}
+\newcommand{\BRDMAN}[1][]{%
+  \codebubble{brdbg}{brdtext}{um2140\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
+}
+\newcommand{\DSMAN}[1][]{%
+  \codebubble{dsbg}{dstext}{ds11853\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
+}
+\newcommand{\PMMAN}[1][]{%
+  \codebubble{pmbg}{pmtext}{pm0253\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
+}
+\newcommand{\LCDMAN}[1][]{%
+  \codebubble{lcdbg}{lcdtext}{ST7789H2\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
+}
+\newcommand{\ANMAN}[1][]{%
+  \codebubble{anbg}{antext}{an2606\if\relax\detokenize{#1}\relax\else\ \textbf{#1}\fi}%
+}
+\newcommand{\REG}[1]{\codebubble{regbg}{regtext}{\textbf{#1}}}
+\newcommand{\PER}[1]{\codebubble{perbg}{pertext}{\textbf{#1}}}
+\newcommand{\MEMORY}[1]{\codebubble{membg}{memtext}{#1}}
+\newcommand{\MCU}{\textsf{\textbf{STM32F723IE}}}
+\newcommand{\BOARD}{\textsf{\textbf{32F723EDISCOVERY}}}
+
+% Define a custom light blue color
+\definecolor{lightbluebg}{HTML}{EBF3FA}
+\definecolor{darkblueborder}{HTML}{2B6CB0}
+
+% Define the custom \question{...} command
+\newcommand{\question}[1]{%
+  \begin{tcolorbox}[
+    colback=lightbluebg,       % Light blue background
+    colframe=darkblueborder,   % Darker blue border
+    arc=3mm,                   % Rounded corner radius
+    boxrule=1pt,               % Border thickness
+    left=12pt, right=12pt,     % Inside padding (left/right)
+    top=10pt, bottom=10pt,     % Inside padding (top/bottom)
+    enhanced,
+    breakable                  % Allows the box to split across pages safely
+  ]
+    \textbf{Pregunta:} #1
+  \end{tcolorbox}%
+}

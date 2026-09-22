@@ -60,7 +60,7 @@
 
             void encender_led(void) {
                 // 1) creación de nuestro puntero (indicamos el tipo del mismo)
-                uint32_t * p_led = (uint32_t *) GPIOA_MODER_ADDR;
+                uint32_t * p_led = (uint32_t *) DIRECCION_OBJETIVO;
 
                 // 2) Escribimos sobre esa dirección de memoria
                 *p_led = 0x00000001; 

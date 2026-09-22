@@ -1,0 +1,302 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\section{Los periféricos del procesador}
+
+    Un procesador, o la idea de procesador que podemos tener en general (máquina que ejecuta instrucciones secuencialmente) es sólo una pequeña parte de toda la historia. La parte ejecutora de instrucciones es el núcleo o \emph{core}. Con esto, el procesador sólo sería capaz de procesar instrucciones... y poco más. 
+    
+    Para delegar funciones, y permitir interconectarlo con el exterior, un procesador se rodea de periféricos. Estos periféricos se pueden configurar para realizar, de manera autónoma, funciones que de otra manera tendrían ocupado al procesador. Algunos de los más comunes son temporizadores, manejadores de protocolos de intercomunicación, aceleradores hardware para funciones complejas (seguridad, criptografía...), motores de acceso a memoria directo (DMAs), etc.
+
+    Todos estos periféricos se manejan desde direcciones de memoria, donde se mapean todos los registros internos. En nuestro caso concreto, y como ejemplo, el procesador \MCU cuenta con un bus principal de memoria de tipo AXI (\emph{Advanced Extensible Interface}) para enviar y recibir datos del espacio de memoria. Numerosos buses secundarios de tipo AHB (\emph{Advanced High-Performance Bus} se conectan a través de una matriz de interconexión (\REFMAN[2]), que a su vez sirven diferentes subconjuntos de dispositivos como se muestra en la \Cref{fig:processor_interconnect}.
+
+    \begin{figure}
+        \centering
+        \begin{tikzpicture}[
+            font=\sffamily,
+            >=Stealth,
+            bus/.style={
+                rectangle,
+                draw=blue!70!black,
+                fill=blue!10,
+                thick,
+                align=center,
+                minimum height=0.75cm,
+                font=\sffamily\bfseries\small,
+                rounded corners=2pt
+            },
+            block/.style={
+                rectangle,
+                draw=gray!60!black,
+                fill=gray!5,
+                thick,
+                align=left,
+                inner sep=6pt,
+                font=\sffamily\footnotesize,
+                rounded corners=2pt
+            },
+            processor/.style={
+                rectangle,
+                draw=red!60!black,
+                fill=red!5,
+                thick,
+                align=left,
+                inner sep=6pt,
+                font=\sffamily\bfseries\small,
+                rounded corners=2pt
+            },
+            line/.style={
+                draw,
+                thick,
+                <->,
+                color=gray!80!black
+            },
+        ]
+            \node (proc) [processor] {STM32F723};
+
+            % Top Level: Multi-AHB BusMatrix
+            \node (busmatrix) [bus, minimum width=6cm, below=1cm of proc] {AXI-TO-AHB BUS MATRIX};
+
+            % Level 1: AHB Buses
+            \node (ahb2) [bus, minimum width=3cm, below=0.8cm of busmatrix] {AHB2 BUS};
+            \node (ahb1) [bus, minimum width=3cm, left=1.5cm of ahb2] {AHB1 BUS};
+            \node (ahb3) [bus, minimum width=3cm, right=1.5cm of ahb2] {AHB3 BUS};
+
+            % Level 2: Blocks connected to AHB Buses
+            % Under AHB1
+            \node (periph_dma) [block, below left=1.0cm and 1cm of ahb1, anchor=north] {
+                \textbf{Periphs \& DMAs}\\[3pt]
+                \textbullet~GPIOA--I\\
+                \textbullet~CRC\\
+                \textbullet~BKPSRAM\\
+                \textbullet~DMA1/2\\
+                \textbullet~USB HS
+            };
+
+            \node (bridges) [bus, below right=2.0cm and 0cm of ahb1, anchor=north, align=center, minimum width=2.6cm] {
+                \textbf{AHB/APB}\\[2pt]
+                \textbf{Bridges}
+            };
+
+            % Under AHB2
+            \node (periph_ahb2) [block, below=1.0cm of ahb2] {
+                \textbf{Peripherals}\\[3pt]
+                \textbullet~AES\\
+                \textbullet~RNG\\
+                \textbullet~USB FS
+            };
+
+            % Under AHB3
+            \node (fmc) [block, below left=1.0cm and -0.3cm of ahb3, anchor=north, align=center, minimum width=1.4cm] {
+                \textbf{FMC}
+            };
+            \node (qspi) [block, below right=1.0cm and -0.3cm of ahb3, anchor=north, align=center, minimum width=1.4cm] {
+                \textbf{QSPI}
+            };
+
+            % Level 3: APB Buses (below AHB/APB Bridges)
+            \node (apb1_bus) [bus, minimum width=3.2cm, below left=2.2cm and 0cm of bridges] {APB1 BUS};
+            \node (apb2_bus) [bus, minimum width=3.2cm, right=3.6cm of apb1_bus] {APB2 BUS};
+
+            % Level 4: APB Peripherals
+            \node (apb1_periph) [block, below=0.6cm of apb1_bus] {
+                \textbf{Peripherals}\\[3pt]
+                \textbullet~TIM2-7\\
+                \textbullet~TIM12-14\\
+                \textbullet~LPTIM1\\
+                \textbullet~WWDG\\
+                \textbullet~SPI2/3\\
+                \textbullet~UART2-5\\
+                \textbullet~I2C1-3\\
+                \textbullet~CAN1\\
+                \textbullet~PWR\\
+                \textbullet~DAC\\ 
+                \textbullet~UART7-8\\
+            };
+
+            \node (apb2_periph) [block, below=0.6cm of apb2_bus] {
+                \textbf{Peripherals}\\[3pt]
+                \textbullet~TIM1, 8\\
+                \textbullet~USART1, 6\\
+                \textbullet~SDMMC1, 2\\
+                \textbullet~ADC\\
+                \textbullet~SPI1, 4, 5\\
+                \textbullet~SYSCFG\\
+                \textbullet~TIM9-11\\
+                \textbullet~SAI1/2\\
+                \textbullet~USBPHYC\\
+            };
+
+            \draw [line] (proc.south) -- node[right] {AXI BUS} (busmatrix.north);
+
+            % Connections
+            % From BusMatrix to AHB Buses
+            \draw [line] (busmatrix.west) -| (ahb1.north);
+            \draw [line] (busmatrix.south) -- (ahb2.north);
+            \draw [line] (busmatrix.east) -| (ahb3.north);
+
+            % From AHB1
+            \draw [line] (ahb1.south) -- ++(0,-0.4) -| (periph_dma.north);
+            \draw [line] (ahb1.south) -- ++(0,-0.4) -| (bridges.north);
+
+            % From AHB2
+            \draw [line] (ahb2.south) -- (periph_ahb2.north);
+
+            % From AHB3
+            \draw [line] (ahb3.south) -- ++(0,-0.4) -| (fmc.north);
+            \draw [line] (ahb3.south) -- ++(0,-0.4) -| (qspi.north);
+
+            % From AHB/APB Bridges to APB Buses
+            \draw [line] (bridges.south) -- ++(0,-1.0) -| (apb1_bus.north);
+            \draw [line] (bridges.south) -- ++(0,-1.0) -| (apb2_bus.north);
+
+            % From APB Buses to Peripherals
+            \draw [line] (apb1_bus.south) -- (apb1_periph.north);
+            \draw [line] (apb2_bus.south) -- (apb2_periph.north);
+        \end{tikzpicture}
+        \caption{Interconexión del procesador y dispositivos}
+        \label{fig:processor_interconnect}
+    \end{figure}
+
+    Todas estas interconexiones entre buses se identifican, a nivel de hardware, mediante direcciones. En cada punto, y según la dirección de memoria solicitada, se establecerá una conexión entre el origen y destino de la transferencia de datos. Esto es automático desde el punto de vista del procesador o periféricos, que únicamente tendrán que colocar sus datos (o peticiones) y esperar a la confirmación de transacción exitosa.
+
+    \subsection{El bus AXI}
+            El bus \emph{AXI} (\emph{Advanced Extensible Interface}) es el medio que tiene el procesador de enviar sus peticiones al exterior. Perteneciente a la especificación AMBA (\emph{Advanced Microcontroller Bus Architecture}) de ARM, es una interfaz de bus con gran ancho de banda y frecuencia, y baja latencia.
+
+            AXI se basa en un esquema de cinco canales independientes para la transferencia de datos y direcciones:
+            \begin{itemize}
+                \item \textbf{Canal de dirección de lectura (\emph{Read Address}):} Especifica la dirección de memoria para lectura y señales de control.
+                \item \textbf{Canal de datos de lectura (\emph{Read Data}):} Transporta los datos leídos desde el esclavo hacia el maestro, junto con la respuesta de estado (\emph{OKAY}, \emph{ERROR}, etc.).
+                \item \textbf{Canal de dirección de escritura (\emph{Write Address}):} Especifica la dirección de memoria para escritura y señales de control.
+                \item \textbf{Canal de datos de escritura (\emph{Write Data}):} Transporta los datos a escribir.
+                \item \textbf{Canal de respuesta de escritura (\emph{Write Response}):} Permite notificar al maestro del resultado final de la operación de escritura.
+            \end{itemize}
+
+            El dividir el bus en canales de subida y bajada permite lecturas y escrituras simultáneas. Adicionalmente, las señales internas permiten transferencias en ráfaga o incluso fuera de orden.
+
+            \subsubsection{\emph{Handshake} o sincronización}
+
+                Todas las transferencias en cada uno de los 5 canales de AXI utilizan un mecanismo uniforme de sincronización denominado \emph{handshake} bidireccional mediante dos señales principales:
+
+                \begin{itemize}
+                    \item \texttt{VALID}: Generada por el emisor (origen) para indicar que las direcciones, datos o señales de control presentes en el canal son válidos.
+                    \item \texttt{READY}: Generada por el receptor (destino) para indicar que está listo para aceptar la información.
+                \end{itemize}
+
+                La transferencia de datos ocurre exclusivamente en el flanco de reloj ascendente en el que \textbf{ambas} señales (\texttt{VALID} y \texttt{READY}) se encuentran activas en nivel alto ($1$), tal como muestra la \Cref{fig:axi_handshake}. 
+
+                \begin{figure}[htbp]
+                    \centering
+                    \begin{tikzpicture}[font=\sffamily\small, >=Stealth, scale=0.95]
+                        % Grid de guía visual
+                        \draw[gray!20, thin] (0,0) grid[ystep=0.8, xstep=1.5] (7.5, -3.2);
+                        
+                        % Etiquetas de señales
+                        \node[anchor=east] at (-0.2, -0.4) {\textbf{CLK}};
+                        \node[anchor=east] at (-0.2, -1.2) {\texttt{VALID}};
+                        \node[anchor=east] at (-0.2, -2.0) {\texttt{READY}};
+                        \node[anchor=east] at (-0.2, -2.8) {\textbf{DATA / ADDR}};
+
+                        % Traza del Reloj (CLK)
+                        \draw[thick, blue!80!black] (0,-0.7) -- (0.75,-0.7) -- (0.75,-0.1) -- (1.5,-0.1) -- (1.5,-0.7) -- (2.25,-0.7) -- (2.25,-0.1) -- (3.0,-0.1) -- (3.0,-0.7) -- (3.75,-0.7) -- (3.75,-0.1) -- (4.5,-0.1) -- (4.5,-0.7) -- (5.25,-0.7) -- (5.25,-0.1) -- (6.0,-0.1) -- (6.0,-0.7) -- (6.75,-0.7) -- (6.75,-0.1) -- (7.5,-0.1);
+
+                        % Traza de VALID
+                        \draw[thick, red!70!black] (0,-1.5) -- (1.5,-1.5) -- (1.7,-0.9) -- (6.0,-0.9) -- (6.2,-1.5) -- (7.5,-1.5);
+
+                        % Traza de READY
+                        \draw[thick, green!50!black] (0,-2.3) -- (3.0,-2.3) -- (3.2,-1.7) -- (4.5,-1.7) -- (4.7,-2.3) -- (7.5,-2.3);
+
+                        % Traza de Datos/Dirección
+                        \draw[thick, orange!80!black] (0,-3.0) -- (1.5,-3.0) -- (1.7,-2.6) -- (6.0,-2.6) -- (6.2,-3.0) -- (7.5,-3.0);
+                        \node at (3.8, -2.8) {\footnotesize Dato / Dirección Válida};
+
+                        % Marcador de transferencia efectiva
+                        \draw[purple, ultra thick, ->] (3.75, -0.2) -- (3.75, -3.2);
+                        \node[purple, font=\sffamily\bfseries\footnotesize, fill=white, inner sep=2pt] at (3.75, -3.5) {Transferencia consolidada};
+                    \end{tikzpicture}
+                    \caption{Sincronización por \emph{handshake} en un canal AXI. La transferencia se realiza únicamente cuando \texttt{VALID} y \texttt{READY} coinciden en nivel alto durante el flanco del reloj.}
+                    \label{fig:axi_handshake}
+                \end{figure}
+
+        \subsection{El bus AHB y APB}
+            El bus \emph{AHB} interconecta el procesador con las memorias internas (SRAM, Flash) y los periféricos (como los controladores DMA, Ethernet o USB). Aunque se podría utilizar AXI, AHB es más sencillo y evita una compleja lógica de control en cada uno de los periféricos, mientras que mantiene un rendimiento elevado.
+
+            Su funcionamiento es mucho más sencillo, con dos fases (envío de dirección y envío de datos) que se suceden en el tiempo. Para mejorar el rendimiento, estas fases se pueden solapar formando un pipeline.
+
+            Los periféricos sencillos o de baja velocidad no se conectan directamente al bus de altas prestaciones (AHB) debido a sus menores requerimientos de velocidad y a la necesidad de no recargar el bus principal. Para ello se emplean buses de periferia más simples, como el bus \emph{APB} (\emph{Advanced Peripheral Bus}), y elementos de adaptación denominados \textbf{puentes} (\emph{bridges}).
+
+        \subsection{El puente entre bus y registro}
+
+            Un puente (\emph{Bridge}) actúa como un esclavo dentro del bus de alta velocidad (AHB) y como el único maestro en el bus periférico (APB). Su función principal es traducir las transacciones de alta velocidad de AHB en lecturas y escrituras de 2 ciclos de reloj (dirección y dato) en APB.
+
+            Cuando se realiza una lectura o escritura en una dirección de memoria correspondiente a un periférico, se sigue el siguiente flujo:
+
+            \begin{enumerate}
+                \item \textbf{Decodificación en bus/puente:} El decodificador examina los bits superiores de la dirección del bus hasta identificar el periférico correspondiente.
+                \item \textbf{Selección de Periférico:} El puente activa la señal de selección individual correspondiente al periférico deseado (\texttt{PSELx}).
+                \item \textbf{\emph{Offset} de Registro:} Los bits inferiores de la dirección seleccionan el registro interno dentro del periférico.
+                \item \textbf{Escritura / Lectura:} El periférico lee o escribe en el registro indicado los datos indicados.
+            \end{enumerate}
+
+   
+        \subsection{La interconexión con diferentes memorias}
+
+            La interconexión con las memorias se hace de manera similar a como se hace con el resto de los periféricos. Al fin y al cabo, recibirán una dirección y dato, además de una operación (escritura/lectura) y con tan solo esa información podrán operar. Sin embargo, además de los buses habituales, suelen existir otros buses secundarios que ofrecen accesos directos.
+
+            \subsubsection{Memorias acopladas mediante ITCM y DTCM}
+
+                Para evitar saturar la matriz de buses cuando el núcleo ejecuta instrucciones a frecuencias muy elevadas, el procesador suele integrar interfaces de memorias con cero estados de espera (\emph{Zero Wait State}).
+
+                \begin{itemize}
+                    \item \textbf{ITCM (\emph{Instruction Tightly-Coupled Memory}):} Bus y memoria dedicados exclusivamente a la búsqueda y ejecución de código. 
+                    \item \textbf{DTCM (\emph{Data Tightly-Coupled Memory}):} Bus y memoria dedicados a datos críticos de tiempo real.
+                \end{itemize}
+
+            \subsubsection{Controladores de memoria externa (FMC, QSPI, Flash...)}
+                
+                Si los requisitos del sistema piden más memoria que la alcanzable con las anteriores interfaces, se utilizan periféricos, ya a través de los buses AHB, que interconectan con memorias externas de amayores tamaños. Por ejemplo:
+
+                \begin{itemize}
+                    \item \textbf{FMC (\emph{Flexible Memory Controller}):} Permite conectar memorias externas paralelas como SDRAM, SRAM o NOR Flash.
+                    
+                    \item \textbf{QSPI (\emph{Quad-SPI Interface}):} Interfaz serie de alta velocidad para memorias Flash externas. 
+                \end{itemize}
+
+        \subsection{Ejemplos de periféricos}
+            Los periféricos integrados en el microcontrolador abstraen al procesador de tareas de bajo nivel. Por ejemplo, para interconectar mediante dispositivos externos con protocolos como \PER{USB} \REFMAN[32,33], \PER{UART} \REFMAN[27], \PER{SPI} \REFMAN[28]... en lugar de tener al procesador ocupado, tenemos periféricos que autogestionan la conexión y avisan al procesador sólo cuando hay una decisión que tomar.
+
+            También la gestión de entrada/salida mediante pines de propósito general es controlada mediante los periféricos \PER{GPIO} \REFMAN[6], por ejemplo para encender LEDs o leer el estado de botones.
+
+            O todo lo referente a temporización del sistema, mediante periféricos como los temporizadores \PER{TIM} \REFMAN[21] o el reloj de tiempo real \PER{RTC} \REFMAN[25].
+
+        %\subsubsection{Puertos de Entrada/Salida de Propósito General (GPIO)}
+        %Permiten la interacción digital binaria directa con los pines del %microcontrolador. Se configuran mediante registros específicos como:
+        %\begin{itemize}
+        %    \item \texttt{MODER}: Define la función del pin (Entrada, Salida digital, Función Alternativa o Analógico).
+        %    \item \texttt{ODR} / \texttt{IDR}: Registros para leer el estado de entrada (\emph{Input Data}) o escribir el estado de salida (\emph{Output Data}).
+        %    \item \texttt{BSRR}: Registro de modificación atómica (\emph{Bit Set/Reset Register}), que permite poner a '1' o '0' pines individuales sin realizar operaciones de lectura-modificación-escritura.
+        %\end{itemize}
+
+        %\subsubsection{Temporizadores Hardware (\emph{Timers})}
+        %Módulos contadores autónomos impulsados por un reloj base. Se componen %fundamentalmente de:
+        %\begin{itemize}
+        %    \item \textbf{Prescaler (\texttt{PSC}):} Divisor del reloj de entrada para ajustar la frecuencia de conteo.
+        %    \item \textbf{Contador (\texttt{CNT}):} Registro que se incrementa/decrementa en cada ciclo de reloj escalado.
+        %    \item \textbf{Registro de Recarga Automática (\texttt{ARR}):} Define el valor máximo del contador antes de desbordarse (\emph{Update Event}) y reiniciar la cuenta.
+        %    \item \textbf{Canales de Captura/Comparación (\texttt{CCR}):} Utilizados para generar señales moduladas por ancho de pulso (\emph{PWM}) o medir periodos externos.
+        %\end{itemize}
+
+        %\subsubsection{Interfaces de Comunicación Serie (UART / USART)}
+        %Periféricos para transmisión asíncrona/síncrona de datos. Cuentan con un %generador de tasa de baudios (\texttt{BRR}), registros de desplazamiento (\emph%{shift registers}) para conversión serie/paralelo y *buffers* de datos de %recepción y transmisión (\texttt{RDR} / \texttt{TDR}).
+
+        \subsection{Activación de periféricos}
+            Un aspecto muy a tener en cuenta en microcontroladores modernos es la gestión de energía. Por defecto, todos los periféricos del microcontrolador están desactivados tras el reseteo (sus señales de reloj están desconectadas).
+
+            Para conectarlas y dar servicio a los periféricos, se deben activar uno a uno mediante señales específicas. Normalmente, un periférico es el responsable de esta activación, y en concreto en el \MCU es el \PER{RCC} \REFMAN[5].
+
+        \subsubsection{El periférico \PER{RCC} (\emph{Reset and Clock Control})}
+            El periférico \PER{RCC} \REFMAN[5] gestiona los relojes del sistema (origen, frecuencia, forma...) y la habilitación individual del reloj de cada periférico.
+
+            Antes de poder leer o escribir en cualquier registro de un periférico, habrá que haber activado previamente su señal de reloj en el registro RCC correspondiente.
+
+\end{document}
