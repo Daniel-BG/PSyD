@@ -79,7 +79,7 @@
 
         \begin{lstlisting}
             void SysTick_Handler(void) {
-                msTicks++;
+                // ... completar añadir un tick a nuestra variable
             }
         \end{lstlisting}
 
@@ -89,14 +89,31 @@
 
         \begin{lstlisting}
             static void inline  Delay_ms(uint32_t ms) {
-                uint32_t start = GetTick();
-                while ((GetTick() - start) < ms);
+                // ... completar guardar tick actual y esperar en un bucle a que pasen 
+                // tantos ticks como se indican
             }
         \end{lstlisting}
 
         Como la variable \texttt{msTicks} es un entero de 32 bits, tenemos suficiente margen como para contar unos $\approx50$ días. En ese momento, la cuenta volverá a cero. No es un problema en cualquier caso para diferencias relativas de tiempo, donde, aunque hayamos hecho \emph{overflow}, la resta de dos tiempos siempre estará en ese rango de $\approx50$ días.
         
         Con este contador de tiempo preparado, prepara ahora un código donde seas capaz de detectar si hay \emph{dobles clicks} en un botón, tomando las referencias temporales con \texttt{GetTick()} cada vez que se pulse, y comprobando que dos consecutivas estén por debajo de los, por ejemplo, 500ms. Recuerda llamar a \texttt{Systick\_Init()} desde tu código main. No es necesario que actives interrupciones en \PER{NVIC} pues ya están por defecto activadas.
+
+        \begin{lstlisting}
+            void TIM3_IRQHandler(void) {
+                // Check if Update Interrupt flag is set
+                if (TIM_CHECK_FLAG(TIM3)) {
+                    // Clear the timer interrupt flag
+                    TIM_CLEAR_FLAG(TIM3);
+
+                    // ... completar comprobar lógica de doble click
+                    // mirando el estado del botón y el tiempo transcurrido
+                    // tras la última pulsación
+                    
+                    EXTI_CLEAR_PENDING(0);
+                    EXTI_UNMASK_INTERRUPT(0, 1);
+                }
+            }
+        \end{lstlisting}
 
     
     \subsection{Para hacer más}

@@ -8,7 +8,7 @@
     
     Para delegar funciones, y permitir interconectarlo con el exterior, un procesador se rodea de periféricos. Estos periféricos se pueden configurar para realizar, de manera autónoma, funciones que de otra manera tendrían ocupado al procesador. Algunos de los más comunes son temporizadores, manejadores de protocolos de intercomunicación, aceleradores hardware para funciones complejas (seguridad, criptografía...), motores de acceso a memoria directo (DMAs), etc.
 
-    Todos estos periféricos se manejan desde direcciones de memoria, donde se mapean todos los registros internos. En nuestro caso concreto, y como ejemplo, el procesador \MCU cuenta con un bus principal de memoria de tipo AXI (\emph{Advanced Extensible Interface}) para enviar y recibir datos del espacio de memoria. Numerosos buses secundarios de tipo AHB (\emph{Advanced High-Performance Bus} se conectan a través de una matriz de interconexión (\REFMAN[2]), que a su vez sirven diferentes subconjuntos de dispositivos como se muestra en la \Cref{fig:processor_interconnect}.
+    Todos estos periféricos se manejan desde direcciones de memoria, donde se mapean todos los registros internos. En nuestro caso concreto, y como ejemplo, el procesador \MCU{} cuenta con un bus principal de memoria de tipo AXI (\emph{Advanced Extensible Interface}) para enviar y recibir datos del espacio de memoria. Numerosos buses secundarios de tipo AHB (\emph{Advanced High-Performance Bus} se conectan a través de una matriz de interconexión (\REFMAN[2]), que a su vez sirven diferentes subconjuntos de dispositivos como se muestra en la \Cref{fig:processor_interconnect}.
 
     \begin{figure}
         \centering
@@ -292,9 +292,8 @@
         \subsection{Activación de periféricos}
             Un aspecto muy a tener en cuenta en microcontroladores modernos es la gestión de energía. Por defecto, todos los periféricos del microcontrolador están desactivados tras el reseteo (sus señales de reloj están desconectadas).
 
-            Para conectarlas y dar servicio a los periféricos, se deben activar uno a uno mediante señales específicas. Normalmente, un periférico es el responsable de esta activación, y en concreto en el \MCU es el \PER{RCC} \REFMAN[5].
+            Para conectarlas y dar servicio a los periféricos, se deben activar uno a uno mediante señales específicas. Normalmente, un periférico es el responsable de esta activación, y en concreto en el \MCU{} es el \PER{RCC} \REFMAN[5].
 
-        \subsubsection{El periférico \PER{RCC} (\emph{Reset and Clock Control})}
             El periférico \PER{RCC} \REFMAN[5] gestiona los relojes del sistema (origen, frecuencia, forma...) y la habilitación individual del reloj de cada periférico.
 
             Antes de poder leer o escribir en cualquier registro de un periférico, habrá que haber activado previamente su señal de reloj en el registro RCC correspondiente.

@@ -129,7 +129,7 @@
             static void TIM_INIT(TIM_TypeDef *TIMx, uint32_t preescaler, uint32_t autoreload, uint32_t enable_counter, uint32_t enable_oneshot);
         \end{lstlisting}
         
-        Y por último tendremos que activar los bits correspondientes en \REG{APB1ENR} (\REFMAN[5.3.13]), y adicionalmente activar en \REG{NVIC} (\REFMAN[9.1.12]) las líneas de interrupción adecuadas:
+        Y por último tendremos que activar los bits correspondientes en \REG{APB1ENR} (\REFMAN[5.3.13]), y adicionalmente activar en \REG{NVIC} (\REFMAN[9.1.2]) las líneas de interrupción adecuadas:
 
         \begin{lstlisting}
             RCC_APB1ENR->bits.TIM2EN = 1;
@@ -146,14 +146,6 @@
         \begin{lstlisting}
             // Handles Task 1: Blink LED1 (Green) each 0.5 seconds
             void TIM2_IRQHandler(void) {
-                //... completar comprobar que el flag está activo
-                if () {
-                    //... completar borrar el flag
-                    //... completar funcionalidad deseada
-                }
-            }
-
-            void TIM3_IRQHandler(void) {
                 //... completar comprobar que el flag está activo
                 if () {
                     //... completar borrar el flag
@@ -178,7 +170,7 @@
 
             % --- COLUMNA IZQUIERDA: TIM2 (Independiente) ---
             \node (tim2_start) [event] {\textbf{Interrupción}};
-            \node (tim2_toggle) [block, below=0.6cm of tim2_start] {Conmutar LED Verde\\(PB1)};
+            \node (tim2_toggle) [block, below=0.6cm of tim2_start] {1. Limpiar Flag SR\\2. Conmutar LED Verde\\(PB1)};
             
             \draw [arrow] (tim2_start) -- (tim2_toggle);
 
@@ -192,7 +184,7 @@
             \node (ext0_actions) [block, below=0.6cm of ext0_chk] {
                 1. Borrar bit de \texttt{PR}\\
                 2. Desactivar interrupción (\texttt{IMR})\\
-                3. Reiniciar \texttt{CNT} = 0\\
+                3. Reiniciar \texttt{CNT} = 0 en \texttt{TIM3}\\
                 4. Activar \texttt{TIM3} (\texttt{CR1})
             };
 
@@ -270,7 +262,7 @@
             }
         \end{lstlisting}
 
-        En cuanto al timer, debemos en primer lugar comprobar y borrar si es necesario el flag de interrupción desde \REG{SR} (\REFMAN[19.4.5]). A continuación, y si el botón sigue pulsado (podemos comprobarlo desde el registro \REG{IDR} del \PER{GPIO} (\REFMAN[6.4.5])), efectuar la función deseada (por ejemplo hacer parpadear el LED conectado a PA7). Tras ello, borraremos interrpciones pendientes del botón (por si se hubiera quedado pillado con rebotes) desde \REG{PR} de \PER{EXTI} (\REFMAN[10.9.6]), y re-activaremos las interrupciones de botón en \REG{IMR} (\REFMAN[10.9.1]). Una cuestión importante es que, gracias a haber configurado el temporizador en modo \emph{oneshot}, no es necesario desactivar sus propias interrupciones ya que no volverá a dispararse hasta reiniciar la cuenta.
+        En cuanto al timer 3, debemos en primer lugar comprobar y borrar si es necesario el flag de interrupción desde \REG{SR} (\REFMAN[19.4.5]). A continuación, y si el botón sigue pulsado (podemos comprobarlo desde el registro \REG{IDR} del \PER{GPIO} (\REFMAN[6.4.5])), efectuar la función deseada (por ejemplo hacer parpadear el LED conectado a PA7). Tras ello, borraremos interrpciones pendientes del botón (por si se hubiera quedado pillado con rebotes) desde \REG{PR} de \PER{EXTI} (\REFMAN[10.9.6]), y re-activaremos las interrupciones de botón en \REG{IMR} (\REFMAN[10.9.1]). Una cuestión importante es que, gracias a haber configurado el temporizador en modo \emph{oneshot}, no es necesario desactivar sus propias interrupciones ya que no volverá a dispararse hasta reiniciar la cuenta.
 
         \begin{lstlisting}            
             // Debounce Lockout Timer Handler (Fires 10ms after initial edge)

@@ -1,3 +1,9 @@
+#Debug files 
+*.cyclo
+*.d
+*.su
+*.o
+
 ## Core latex/pdflatex auxiliary files:
 *.aux
 *.lof
