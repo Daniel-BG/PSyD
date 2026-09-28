@@ -111,7 +111,7 @@
                     //... completar
                 \end{lstlisting}
 
-            \item Ahora le toca el turno a la UART6 como nos indica \BRDMAN[5.13]. Actívala desde \REG{APB2ENR} lo primero.
+            \item Ahora le toca el turno a la UART6 como nos indica \BRDMAN[5.13]. Actívala desde \REG{APB2ENR} (\REFMAN[5.3.14]) lo primero.
             
                 \begin{lstlisting}
                     //en bsp.h
@@ -173,7 +173,8 @@
                         UART_WORD_7B = 0x02
                     } UART_WordLength_t;
                     #define UART_WORD_MASK  0b1
-                    #define UART_WORD_SHIFT 12
+                    #define UART_WORD_SHIFT_12 12
+                    #define UART_WORD_SHIFT_28 28
 
                     static inline void UART_WORDLENGTH_SET(volatile USART_TypeDef *USARTx, UART_WordLength_t length) {
                         //... completar escribir longitud en registro CR1

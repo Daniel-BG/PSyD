@@ -2,13 +2,14 @@
 
 Bienvenido al sitio web del material de la asignatura de Programación de Sistemas y Dispositivos, del grado en Ingeniería de Computadores en la UCM. Desde aquí puedes acceder a todos los recursos.
 
-## 📖 Teoría
+## 📖 [Teoría](teoria/main.pdf)
 * 📄 [1 - Del alto nivel a la memoria física](teoria/c_to_physical/c_to_physical.pdf)
 * 📄 [2 - Estructuras y definiciones hardware](teoria/hardware_structs/hardware_structs.pdf)
 * 📄 [3 - Enlazado e inicialización](teoria/linking/linking.pdf)
 * 📄 [4 - Interrupciones, barreras y callbacks](teoria/interrupts/interrupts.pdf)
+* 📄 [5 - Periféricos](teoria/peripherals/peripherals.pdf)
 
-## 🛠️ Prácticas
+## 🛠️ [Prácticas](practicas/main.pdf)
 * 📁 [Punto de entrada a las prácticas](practicas/practicas.md)
 * 📁 [Enunciado de la Práctica  0 - Configuración Inicial](practicas/initial_config/initial_config.pdf)
 * 📁 [Enunciado de la Práctica  1 - Memory Mapped IO](practicas/memory_mapped_io/memory_mapped_io.pdf)

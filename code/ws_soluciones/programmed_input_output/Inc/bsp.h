@@ -331,10 +331,12 @@ typedef enum {
 	UART_WORD_7B = 0x02
 } UART_WordLength_t;
 #define UART_WORD_MASK  0b1
-#define UART_WORD_SHIFT 12
+#define UART_WORD_SHIFT_12 12
+#define UART_WORD_SHIFT_28 28
 
 static inline void UART_WORDLENGTH_SET(volatile USART_TypeDef *USARTx, UART_WordLength_t length) {
-    _REGISTER_SET(&USARTx->CR1, UART_WORD_MASK, length, UART_WORD_SHIFT);
+    _REGISTER_SET(&USARTx->CR1, UART_WORD_MASK, length, UART_WORD_SHIFT_12);
+	_REGISTER_SET(&USARTx->CR1, UART_WORD_MASK, length >> 1, UART_WORD_SHIFT_28);
 }
 
 // UART PARITY
