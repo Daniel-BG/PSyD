@@ -6,11 +6,64 @@
 
     Cuando salta una interrupción (cuya dirección está almacenada en la tabla de vectores), el hardware del procesador suspende la ejecución del hilo principal (\lstinline|main|), guarda automáticamente el contexto (registros \texttt{R0-R3}, \texttt{R12}, \texttt{LR}, \texttt{PC}, \texttt{xPSR}) en la pila y salta a la ISR asignada en la tabla de vectores.
 
+    \begin{figure}[htbp]
+        \centering
+        \begin{tikzpicture}[
+            node distance=0.8cm and 1.2cm,
+            font=\small,
+            box/.style={draw, rectangle, rounded corners=3pt, fill=blue!10, draw=blue!60, align=center, minimum width=3.2cm, minimum height=0.8cm},
+            hwbox/.style={draw, rectangle, rounded corners=3pt, fill=orange!15, draw=orange!70, align=center, minimum width=3.2cm, minimum height=0.8cm},
+            isrbox/.style={draw, rectangle, rounded corners=3pt, fill=green!15, draw=green!60, align=center, minimum width=3.2cm, minimum height=0.8cm},
+            vtcell/.style={draw, rectangle, align=center, minimum width=6cm, minimum height=0.6cm, font=\scriptsize, fill=yellow!10, draw=yellow!60!black},
+            vtheader/.style={draw, rectangle, align=center, minimum width=6cm, minimum height=0.6cm, font=\scriptsize\bfseries, fill=yellow!30, draw=yellow!60!black},
+            arrow/.style={-{Stealth[length=2.5mm]}, thick, draw=gray!80},
+            lookup/.style={-{Stealth[length=2.5mm]}, thick, draw=red!70, dashed},
+            jump/.style={-{Stealth[length=2.5mm]}, thick, draw=green!60!black}
+        ]
+
+            % Main Thread Box
+            \node (main) [box] {Hilo Principal (\texttt{main})};
+            
+            % Hardware event
+            \node (irq) [hwbox, right=3.9cm of main] {1. Evento de Hardware\\(Disparo de EXTI0 IRQ)};
+            
+            % Context save
+            \node (stack) [hwbox, below=0.8cm of irq] {2. Guardar contexto\\(Hardware apila R0-R3,\\R12, LR, PC, xPSR)};
+
+            % Vector Table representation
+            \node (vt_head) [vtheader, below=1.0cm of stack] {Tabla de Vectores (Memoria Flash)};
+            \node (vt_sp)   [vtcell, below=0cm of vt_head] {\texttt{0x0000\_0000}: Initial Stack Pointer};
+            \node (vt_rst)  [vtcell, below=0cm of vt_sp]   {\texttt{0x0000\_0004}: Reset\_Handler};
+            \node (vt_dots) [vtcell, below=0cm of vt_rst]  {\dots};
+            \node (vt_exti) [vtcell, fill=orange!35, draw=orange!90, below=0cm of vt_dots] {\textbf{\texttt{0x0000\_0058}: \&EXTI0\_IRQHandler}};
+            \node (vt_dots2)[vtcell, below=0cm of vt_exti] {\dots};
+
+            % ISR execution
+            \node (isr) [isrbox, left=3cm of vt_exti] {Ejecución de la ISR\\(\texttt{EXTI0\_IRQHandler})};
+            
+            % Context restore
+            \node (unstack) [hwbox, above=3.5cm of isr] {5. Restaurar Contexto\\(Desapilar registros)};
+
+            % Flow arrows
+            \draw [lookup] (main) -- (irq) node[midway, above, font=\tiny, text=red!80!black] {Interrupción};
+            \draw [arrow] (irq) -- (stack);
+            \draw [arrow] (stack) -- (vt_head) node[midway, right, font=\tiny] {3. Vector determinado por línea};
+            \draw [jump] (vt_exti) -- (isr) node[midway, above, font=\tiny, text=green!50!black] {4. Salto a dirección ISR};
+            \draw [arrow] (isr) -- (unstack);
+            \draw [arrow] (unstack) -- (main) node[midway, right, font=\tiny] {6. Retorno (\texttt{BX LR})};
+
+        \end{tikzpicture}
+        \caption{Mecanismo de atención a interrupciones y lectura de puntero en la Tabla de Vectores.}
+        \label{fig:interrupt_vector_flow}
+    \end{figure}
+
+    
+
     Al compartir variables entre el hilo principal y una rutina de interrupción, surgen problemas de inconsistencia de datos y condiciones de carrera:
 
     \begin{itemize}
         \item \textbf{Uso obligatorio de \lstinline|volatile|:} Evita que el compilador almacene en registros de la CPU el valor de una variable que puede ser alterada por la ISR en cualquier momento.
-        \item \textbf{Operaciones no atómicas:} Si el hilo principal modifica una variable de 32 bits mientras ocurre una interrupción a mitad del proceso de escritura, la ISR leerá datos corruptos.
+        \item \textbf{Operaciones no atómicas:} Si el hilo principal modifica una variable de 32 bits mientras ocurre una interrupción a mitad del proceso de escritura, la ISR leerá datos corruptos. Normalmente, las variables de 32 bits ya se gestionan de manera atómica automáticamente en ARM, pero es mejor protegerlas por si las moscas en caso de poder existir condiciones de carrera.
     \end{itemize}
 
     \begin{lstlisting}
@@ -46,14 +99,14 @@
             \item \textbf{\lstinline|__DMB()| (Data Memory Barrier):} Garantiza que todas las accesos a memoria (lecturas y escrituras) previos a la barrera se hayan completado antes de que se inicie cualquier acceso a memoria posterior. No frena la ejecución de instrucciones que no accedan a memoria.
                 \begin{lstlisting}
                     __attribute__((always_inline)) static inline void __DSB(void) {
-                        __asm volatile ("dsb 0xF":::"memory");
+                        __asm volatile ("dmb 0xF":::"memory");
                     }
                 \end{lstlisting}    
 
             \item \textbf{\lstinline|__DSB()| (Data Synchronization Barrier):} Detiene la ejecución de \textbf{todas} las instrucciones hasta que las operaciones de acceso a memoria pendientes hayan finalizado.
                 \begin{lstlisting}
                     __attribute__((always_inline)) static inline void __DMB(void) {
-                        __asm volatile ("dmb 0xF":::"memory");
+                        __asm volatile ("dsb 0xF":::"memory");
                     }
                 \end{lstlisting}
 
@@ -84,7 +137,49 @@
 
         Para mantener un diseño de software modular, la capa que interactúa directamente con el hardware (\emph{drivers}) no debe contener lógica de aplicación. El mecanismo estándar para notificar eventos desde dichos \emph{drivers} (o una ISR) hacia la aplicación es la utilización de \textbf{punteros a función}. Esta técnica se conoce comúnmente como \emph{callbacks}, ya que la función \emph{hardware} hará una llamada (\emph{callback}) a nuestra función con lógica.
 
-        Un puntero a función almacena la dirección de memoria donde está situada, permitiendo su invocación dinámica en tiempo de ejecución.
+        Un puntero a función almacena la dirección de memoria donde está situada, permitiendo su invocación dinámica en tiempo de ejecución. Podemos ver un esquema en la \Cref{fig:callback_flow}.
+
+        \begin{figure}[htbp]
+            \centering
+            \begin{tikzpicture}[
+                node distance=1.4cm and 1.8cm,
+                layer/.style={draw, dashed, inner sep=10pt, rounded corners=5pt},
+                app/.style={draw, rectangle, rounded corners=3pt, fill=blue!10, draw=blue!60, align=center, minimum width=3.2cm, minimum height=0.85cm, font=\small},
+                driver/.style={draw, rectangle, rounded corners=3pt, fill=orange!15, draw=orange!70, align=center, minimum width=3.2cm, minimum height=0.85cm, font=\small},
+                arrow_reg/.style={-{Stealth[length=2.5mm]}, thick, draw=blue!80, font=\scriptsize},
+                arrow_call/.style={-{Stealth[length=2.5mm]}, thick, draw=red!70, font=\scriptsize}
+            ]
+
+                % Nodes - Application Layer
+                \node (main) [app] {Código de aplicación \texttt{main.c}};
+                \node (app_fn) [app, right=1.75cm of main] {Función de Usuario\\\texttt{mi\_callback(pin)}};
+
+                % Nodes - Driver Layer
+                \node (ptr) [driver, below=1.6cm of app_fn] {Puntero a Función\\\texttt{exti0\_user\_callback}};
+                \node (reg_fn) [driver, left=1.6cm of ptr] {\texttt{gpio\_register\_callback()}};
+                \node (isr) [driver, right=1.6cm of ptr] {Rutina ISR\\\texttt{EXTI0\_IRQHandler()}};
+
+                % Registration Flow
+                \draw [arrow_reg] (main) -- (reg_fn) node[midway, left] {1. Pasa dirección};
+                \draw [arrow_reg] (reg_fn) -- (ptr) node[midway, above] {2. Guarda};
+
+                % Execution Flow
+                \draw [arrow_call] (isr) -- (ptr) node[midway, above] {3. Llama};
+                \draw [arrow_call] (ptr.north) -- (app_fn.south) node[midway, left] {4. Apunta a \emph{Callback}};
+                \draw [arrow_call, dashed] (isr.north west) -- (app_fn.south east);
+
+                % Layers
+                \begin{scope}[on background layer]
+                    \node [layer, fill=orange!5, fit=(reg_fn) (ptr) (isr), label=below:\textbf{Capa de Driver / Hardware (\texttt{gpio\_driver.c})}] {};
+                    \node [layer, fill=blue!5, fit=(app_fn) (main), label=above:\textbf{Capa de Aplicación (\texttt{main.c})}] {};
+                \end{scope}
+
+            \end{tikzpicture}
+            \caption{Mecanismo de Registro y Ejecución de un Call-back.}
+            \label{fig:callback_flow}
+        \end{figure}
+
+        Hay que tener en cuenta que los \emph{callback} se ejecutan desde la interrupción, por tanto el procesador está en modo de atención de ISRs. Estos callbacks no deben incluir procesamiento pesado, y únicamente marcar los valores necesarios o tareas pendientes para que el hilo principal, al volver, los gestione. De lo contrario, estaríamos retrasando cualquier otra llamada a interrupción durante la duración de ejecución del \emph{callback}.
 
         \begin{lstlisting}
             #include <stddef.h>
@@ -96,7 +191,7 @@
             typedef void (*gpio_callback_t)(uint16_t pin);
 
             // Variable del driver para almacenar el callback
-            static gpio_callback_t exti0_user_callback = NULL;
+            static volatile gpio_callback_t exti0_user_callback = NULL;
 
             // Función de la API pública para registrar el callback 
             // desde el código de aplicación (p.ej: main.c)
