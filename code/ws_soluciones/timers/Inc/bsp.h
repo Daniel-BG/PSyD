@@ -314,7 +314,7 @@ typedef enum {
     GPIO_MODE_ANALOG = 0x03
 } GPIO_Mode_t;
 static inline void GPIO_MODE_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_Mode_t mode) {
-    _GPIO_REG_SET(&(GPIOx)->MODER, pin, 0x03, (uint32_t)mode, 2);
+    _GPIO_REG_SET(&GPIOx->MODER, pin, 0x03, (uint32_t)mode, 2);
 }
 
 // GPIO OUTPUT TYPE SET
@@ -323,7 +323,7 @@ typedef enum {
     GPIO_OTYPE_OD = 0x01
 } GPIO_OType_t;
 static inline void GPIO_OTYPE_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_OType_t otype) {
-    _GPIO_REG_SET(&(GPIOx)->OTYPER, pin, 0x01, (uint32_t)otype, 1);
+    _GPIO_REG_SET(&GPIOx->OTYPER, pin, 0x01, (uint32_t)otype, 1);
 }
 
 // GPIO OUTPUT SPEED SET
@@ -334,7 +334,7 @@ typedef enum {
     GPIO_OSPEED_VHIGH  = 0x03
 } GPIO_OSpeed_t;
 static inline void GPIO_OSPEED_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_OSpeed_t ospeed) {
-    _GPIO_REG_SET(&(GPIOx)->OSPEEDR, pin, 0x03, (uint32_t)ospeed, 2);
+    _GPIO_REG_SET(&GPIOx->OSPEEDR, pin, 0x03, (uint32_t)ospeed, 2);
 }
 
 // GPIO PULLUP/DOWN SET
@@ -344,16 +344,16 @@ typedef enum {
     GPIO_PUPD_PD   = 0x02
 } GPIO_PuPd_t;
 static inline void GPIO_PUPD_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_PuPd_t pupd) {
-    _GPIO_REG_SET(&(GPIOx)->PUPDR, pin, 0x03, (uint32_t)pupd, 2);
+    _GPIO_REG_SET(&GPIOx->PUPDR, pin, 0x03, (uint32_t)pupd, 2);
 }
 
 // GPIO ALTERNATE FUNCTIONS
 #define GPIO_AF8_USART6 0x8
 static inline void GPIO_AF_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, uint32_t af) {
 	if (pin < 8) {
-		_GPIO_REG_SET(&(GPIOx)->AFR[0], pin, 0x0F, (uint32_t)af, 4);
+		_GPIO_REG_SET(&GPIOx->AFR[0], pin, 0x0F, (uint32_t)af, 4);
 	} else {
-		_GPIO_REG_SET(&(GPIOx)->AFR[1], pin-8, 0x0F, (uint32_t)af, 4);
+		_GPIO_REG_SET(&GPIOx->AFR[1], pin-8, 0x0F, (uint32_t)af, 4);
 	}
 }
 

@@ -131,7 +131,7 @@ typedef enum {
 } GPIO_Mode_t;
 
 static inline void GPIO_MODE_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_Mode_t mode) {
-    _GPIO_REG_SET(&(GPIOx)->MODER, pin, 0x03, (uint32_t)mode, 2);
+    _GPIO_REG_SET(&GPIOx->MODER, pin, 0x03, (uint32_t)mode, 2);
 }
 
 //GPIO OUTPUT TYPE SET
@@ -141,7 +141,7 @@ typedef enum {
 } GPIO_OType_t;
 
 static inline void GPIO_OTYPE_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_OType_t otype) {
-    _GPIO_REG_SET(&(GPIOx)->OTYPER, pin, 0x01, (uint32_t)otype, 1);
+    _GPIO_REG_SET(&GPIOx->OTYPER, pin, 0x01, (uint32_t)otype, 1);
 }
 
 //GPIO OUTPUT SPEED SET
@@ -153,7 +153,7 @@ typedef enum {
 } GPIO_OSpeed_t;
 
 static inline void GPIO_OSPEED_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_OSpeed_t ospeed) {
-    _GPIO_REG_SET(&(GPIOx)->OSPEEDR, pin, 0x03, (uint32_t)ospeed, 2);
+    _GPIO_REG_SET(&GPIOx->OSPEEDR, pin, 0x03, (uint32_t)ospeed, 2);
 }
 
 //GPIO PULLUP/DOWN SET
@@ -164,7 +164,7 @@ typedef enum {
 } GPIO_PuPd_t;
 
 static inline void GPIO_PUPD_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_PuPd_t pupd) {
-    _GPIO_REG_SET(&(GPIOx)->PUPDR, pin, 0x03, (uint32_t)pupd, 2);
+    _GPIO_REG_SET(&GPIOx->PUPDR, pin, 0x03, (uint32_t)pupd, 2);
 }
 
 //ATOMIC GPIO WRITE VIA BSRR

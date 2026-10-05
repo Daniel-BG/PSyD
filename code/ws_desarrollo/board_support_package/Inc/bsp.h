@@ -124,7 +124,7 @@ typedef enum {
 } GPIO_Mode_t;
 
 static inline void GPIO_MODE_SET(volatile GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_Mode_t mode) {
-    _GPIO_REG_SET(&(GPIOx)->MODER, pin, 0x03, (uint32_t)mode, 2);
+    _GPIO_REG_SET(&GPIOx->MODER, pin, 0x03, (uint32_t)mode, 2);
 }
 
 //GPIO OUTPUT TYPE SET

@@ -1,0 +1,243 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\section{Temporización}
+
+    En el centro de todo procesador está el reloj. Es quien, en cada ciclo, dicta cuándo los datos tienen que moverse de un lugar a otro, haciendo que se actualicen los registros con nuevos valores, cuya propagación prepara los resultados para el siguiente ciclo... y así sucesivamente. En los procesadores de hoy en día, no existe un solo reloj, sino que multitud de diferentes fuentes proveen de señales de reloj distintas a todos sus componentes.
+
+    Aparte de llevar la actualización secuencial de los datos, el reloj también sirve como base para contar el tiempo que sucede entre diferentes eventos del sistema. Así, se puede controlar el tiempo de ejecución de tareas en un SSOO, las señales PWM que controlan la intensidad de LEDs o velocidad de motores, medir frecuencias y velocidades externas, conversiones digital-analógica, despertar al procesador tras un tiempo determinado... Para ello, contamos con diferentes periféricos que nos facilitarán la gestión de todas estas tareas.
+
+    ¿Pero primero, cómo empieza a generarse la señal de reloj?
+
+    \subsection{Osciladores}
+
+        La base de cualquier tipo de temporización es el oscilador, que proporciona una señal cuadrada para utilizar como reloj del sistema. Principalmente existen dos tipos: integrados en la CPU, de menor precisión pero disponibles \emph{out of the box}, y externos, que suelen ser más precisos, pero requieren de espacio adicional en la PCB.
+
+        Los osciladores integrados internos funcionan alimentando un pequeño condensador con una corriente continua. Esto hace que se vaya llenando y su voltaje se incremente poco a poco. Un comparador de voltaje detecta cuando este voltaje cruza un umbral de referencia, descargando el condensador inmediatamente mediante un transistor. Este proceso se repite sucesivamente, alternando el valor de un flip-flop y generando así la onda cuadrada necesaria para el reloj. Debido a las diferencias de fabricación, la velocidad de recarga y el umbral de referencia no son necesariamente fijos, por lo que se guardan valores de calibración en el procesador para que todas las unidades funcionen, aproximadamente, a la misma velocidad.
+
+        Aún así, la resistencia, capacitancia y voltaje son dependientes de la temperatura, por lo que estas fuentes de reloj pueden variar en frecuencia según parámetros ambientales, por lo que no se utilizan en aplicaciones de precisión.
+
+        Los osciladores externos dan, desde el exterior, una onda de reloj al procesador. Los más comunes se basan en un cristal de cuarzo que, sometido a un campo eléctrico, vibra a una frecuencia determinada dada por su forma. Controlando los procesos de fabricación, se puede controlar esa frecuencia, que en cualquier caso será fija una vez fabricado.
+
+        Los osciladores integrados suelen tener una tolerancia de $\pm 1\%$, mientras que los externos de cristal de cuarzo oscilan entre tolerancias del $\pm 0.005\%$ hasta $\pm 0.00005\%$. Esto quiere decir que, mientras un oscilador interno puede desviarse hasta 15 minutos al día, un oscilador de cristal de alta precisión solo se desvía, como mucho, 1-5 segundos por año. Los modelos más precisos (para aplicaciones de temporización crítica) son capaces de precisiones de fracciones de milisegundo al año. Para precisiones aún mayores (como el GPS) se utilizan relojes atómicos basados en la descomposición de ciertos elementos radiactivos.
+
+        Adicionalmente, se suele contar con osciladores de baja (low) y alta (high) frecuencia, para uso en diferentes elementos del procesador (el núcleo irá a alta frecuencia, mientras que funciones de bajo consumo irán a baja frecuencia). El oscilador por defecto del \MCU es el HSI (\emph{high speed internal oscillator}) a 16MHz de frecuencia.
+
+    \subsection{Árbol de reloj}
+    
+        Normalmente no se dispone de un solo oscilador (ya sea interno o externo) sino que se tienen varios para uso en diferentes elementos del procesador. Por ejemplo, el núcleo interesa que vaya a alta frecuencia, mientras que funciones de bajo consumo vayan a baja frecuencia. Pero si sólo tuviéramos un oscilador rápido, lo segundo sería imposible. Así, en numerosas ocasiones se dispone de hasta 4 osciladores:
+
+        \begin{itemize}
+            \item HSI: \emph{High speed internal:} De alta velocidad sintetizado por el propio silicio
+            \item LSI: \emph{Low speed internal:} De baja velocidad sintetizado por el propio silicio
+            \item HSE: \emph{High speed external:} De alta velocidad proveniente de un cristal de cuarzo.
+            \item LSE: \emph{Low speed external:} De baja velocidad proveniente de un cristal de cuarzo.
+        \end{itemize}
+
+        Los de alta velocidad suelen llegar a velocidades de MHz, mientras que los de baja velocidad se mantienen en los KHz.
+
+        El árbol de reloj es la estructura que conecta cada uno de los relojes a los componentes que queramos. Adicionalmente, dispone de multiplicadores y divisores de frecuencia para poder dar diferentes velocidades de reloj a los periféricos (especialmente interesante para protocolos con una frecuencia base fija estandarizada). Se muestra un ejemplo de árbol de reloj en la \Cref{fig:clocktree}
+
+        \begin{figure}
+            \centering
+        
+            % --- PALETA DE COLORES ---
+            \definecolor{colorHSI}{HTML}{E3F2FD}
+            \definecolor{borderHSI}{HTML}{1565C0}
+
+            \definecolor{colorHSE}{HTML}{E0F2F1}
+            \definecolor{borderHSE}{HTML}{00695C}
+
+            \definecolor{colorLSI}{HTML}{FFF3E0}
+            \definecolor{borderLSI}{HTML}{E65100}
+
+            \definecolor{colorLSE}{HTML}{F3E5F5}
+            \definecolor{borderLSE}{HTML}{7B1FA2}
+
+            \definecolor{colorPLL}{HTML}{FCE4EC}
+            \definecolor{borderPLL}{HTML}{C2185B}
+
+            \definecolor{colorBus}{HTML}{E8F5E9}
+            \definecolor{borderBus}{HTML}{2E7D32}
+
+            \definecolor{colorTarget}{HTML}{ECEFF1}
+            \definecolor{borderTarget}{HTML}{37474F}
+
+
+            \begin{tikzpicture}[
+                font=\sffamily\small,
+                >=Stealth,
+                node distance=0.7cm and 0.5cm,
+                % --- ESTILOS DE NODOS ---
+                block/.style={
+                    draw, rectangle, rounded corners=4pt, minimum height=0.85cm, minimum width=2.3cm,
+                    align=center, fill=white, drop shadow={opacity=0.12, shadow xshift=1.5pt, shadow yshift=-1.5pt}
+                },
+                src_hsi/.style={block, fill=colorHSI, draw=borderHSI, thick},
+                src_hse/.style={block, fill=colorHSE, draw=borderHSE, thick},
+                src_lsi/.style={block, fill=colorLSI, draw=borderLSI, thick},
+                src_lse/.style={block, fill=colorLSE, draw=borderLSE, thick},
+                pll_style/.style={block, fill=colorPLL, draw=borderPLL, thick, minimum width=2.8cm},
+                prescaler/.style={block, fill=colorBus, draw=borderBus, thick},
+                target/.style={block, fill=colorTarget, draw=borderTarget, thick},
+                % MUX Trapezoidal (Orientado verticalmente hacia abajo)
+                mux/.style={
+                    draw=orange!80!black, fill=yellow!15, thick,
+                    trapezium, trapezium left angle=70, trapezium right angle=70,
+                    minimum width=3.4cm, minimum height=0.55cm,
+                    shape border rotate=180, align=center, font=\sffamily\tiny\bfseries
+                },
+                % Estilos de líneas
+                wire/.style={draw, ->, >=Stealth, thick, rounded corners=3pt},
+                fast_wire/.style={wire, color=blue!70!black},
+                slow_wire/.style={wire, color=orange!80!black, dashed},
+                tag/.style={font=\sffamily\tiny\bfseries, inner sep=1pt}
+            ]
+
+                % ==========================================
+                % 1. FUENTES DE RELOJ (FILA SUPERIOR)
+                % ==========================================
+                \node [src_hsi] (HSI) {\textbf{HSI}\\16 MHz (Int.)\\$\pm 1\%$ RC};
+                \node [src_hse, right=0.5cm of HSI] (HSE) {\textbf{HSE}\\4--26 MHz (Ext.)\\$\pm 0.005\%$ Cristal};
+                
+                \node [src_lsi, right=1.2cm of HSE] (LSI) {\textbf{LSI}\\$\sim 32$ kHz (Int.)\\Bajo Consumo};
+                \node [src_lse, right=0.5cm of LSI] (LSE) {\textbf{LSE}\\32.768 kHz (Ext.)\\$\pm 0.00005\%$ RTC};
+
+                % ==========================================
+                % 2. MULTIPLICADOR (PLL) Y PERIFÉRICOS DE BAJA VELOCIDAD
+                % ==========================================
+                % PLL centrado bajo HSI y HSE
+                \node [pll_style, below=1.0cm of $(HSI.south)!0.5!(HSE.south)$] (PLL) {\textbf{Sintetizador PLL}\\Multiplicador ($\times N$) / Divisor ($/M, /P$)};
+
+                % Destinos de baja frecuencia alineados verticalmente bajo LSI y LSE
+                \node [target, below=1cm of LSI] (IWDG) {\textbf{IWDG}\\Watchdog Indep.};
+                \node [target, below=1cm of LSE] (RTC) {\textbf{RTC}\\Reloj Tiempo Real};
+
+                % ==========================================
+                % 3. SELECTOR DE RELOJ DEL SISTEMA (SYSCLK MUX)
+                % ==========================================
+                \node [mux, below=0.8cm of PLL] (SYS_MUX) {SYSCLK MUX (Selección de Reloj)};
+
+                % ==========================================
+                % 4. ÁRBOL DE DISTRIBUCIÓN (AHB & APB)
+                % ==========================================
+                \node [prescaler, below=1cm of SYS_MUX, minimum width=3.8cm] (AHB_PRE) {\textbf{Prescalador AHB}\\Divisor de Bus Principal (/1, /2 ... /512)};
+
+                % Prescaladores APB y Núcleo CPU distribuidos horizontalmente
+                
+                \node [target, below=1.2cm of AHB_PRE, minimum width=2.2cm] (CPU) {\textbf{Núcleo CPU}\\Cortex-M (f. max)};
+                \node [prescaler, right=1cm of CPU, minimum width=2.4cm] (APB1_PRE) {\textbf{APB1 Prescaler}\\Baja Vel. (Max 45MHz)};
+                \node [prescaler, right=1cm of APB1_PRE, minimum width=2.4cm] (APB2_PRE) {\textbf{APB2 Prescaler}\\Alta Vel. (Max 90MHz)};
+
+                % Periféricos finales
+                \node [target, below=0.8cm of APB1_PRE, minimum width=2.4cm] (PERIPH1) {\textbf{Periféricos Lentos}\\USART, I2C, CAN};
+                \node [target, below=0.8cm of APB2_PRE, minimum width=2.4cm] (PERIPH2) {\textbf{Periféricos Rápidos}\\Timers, GPIO, SPI};
+
+                % ==========================================
+                % CABLEADO Y CONEXIONES
+                % ==========================================
+
+                % HSI -> PLL y MUX Directo
+                \draw [fast_wire] (HSI.south) -- ++(0,-0.3) -| ($(PLL.north west)!0.3!(PLL.north)$);
+                \draw [fast_wire] (HSI.south) -- ++(0,-0.3) -- ++(-1.8,0) -- ++(0,-2.2) -| ($(SYS_MUX.north west)!0.2!(SYS_MUX.north)$);
+
+                % HSE -> PLL y MUX Directo
+                \draw [fast_wire] (HSE.south) -- ++(0,-0.3) -| ($(PLL.north east)!0.3!(PLL.north)$);
+                \draw [fast_wire] (HSE.south) -- ++(0,-0.3) -- ++(1.8,0) -- ++(0,-2.2)  -| ($(SYS_MUX.north east)!0.2!(SYS_MUX.north)$);
+
+                % PLL -> SYS_MUX
+                %\draw [fast_wire] (PLL.south) -- node[right, tag] {VCO} (SYS_MUX.north);
+
+                % SYS_MUX -> AHB
+                \draw [fast_wire] (SYS_MUX.south) -- node[right, tag] {SYSCLK} (AHB_PRE.north);
+
+                % AHB -> CPU, APB1, APB2
+                \draw [fast_wire] (AHB_PRE.south) -- node[right, tag] {HCLK} (CPU.north);
+                \draw [fast_wire] (AHB_PRE.south) -- ++(0,-0.4) -| (APB1_PRE.north);
+                \draw [fast_wire] (AHB_PRE.south) -- ++(0,-0.4) -| (APB2_PRE.north);
+
+                % APB1 & APB2 -> Periféricos
+                \draw [fast_wire] (APB1_PRE.south) -- node[right, tag] {PCLK1} (PERIPH1.north);
+                \draw [fast_wire] (APB2_PRE.south) -- node[right, tag] {PCLK2} (PERIPH2.north);
+
+                % Conexiones de baja frecuencia (LSI / LSE)
+                \draw [slow_wire] (LSI.south) -- (IWDG.north);
+                \draw [slow_wire] (LSE.south) -- (RTC.north);
+
+                % ==========================================
+                % AGRUPACIONES VISUALES (BACKGROUNDS)
+                % ==========================================
+                \begin{scope}[on background layer]
+                    % Fuentes High Speed
+                    \node [draw=blue!30, fill=blue!5, dashed, rounded corners=6pt, inner sep=6pt,
+                        fit=(HSI) (HSE), label={[blue!80!black]above:\textbf{Fuentes Alta Frecuencia}}] {};
+                    
+                    % Fuentes Low Speed y Periféricos asociados
+                    \node [draw=orange!40, fill=orange!5, dashed, rounded corners=6pt, inner sep=6pt,
+                        fit=(LSI) (LSE) (IWDG) (RTC), label={[orange!90!black]above:\textbf{Dominio Baja Frecuencia / RTC}}] {};
+
+                    % Bloque Árbol Principal
+                    \node [draw=green!50!black, fill=green!5, opacity=0.5, rounded corners=8pt, inner sep=8pt,
+                        fit= (AHB_PRE) (APB1_PRE) (APB2_PRE) (CPU) (PERIPH1) (PERIPH2),  %(PLL) (SYS_MUX)
+                        label={[green!40!black]below:\textbf{Árbol Principal de Distribución y Prescaladores}}] {};
+                \end{scope}
+
+            \end{tikzpicture}
+            \caption{Ejemplo de árbol de reloj con diferentes fuentes y destinos}
+            \label{fig:clocktree}
+        \end{figure}
+
+    \subsection{Ticker del sistema}
+
+        El \emph{ticker} del sistema es un temporizador simple integrado directamente en el núcleo de la mayoría de procesadores modernos. A diferencia de los periféricos de temporización estándar, su propósito no es controlar hardware externo, sino proporcionar una base deL tiempo transcurrido desde el inicio, para la gestión interna del software.
+
+        Funciona a partir de un registro contador que se decrementa con cada pulso del reloj del sistema. Al llegar a cero, se recarga automáticamente con un valor preconfigurado (\emph{auto-reload}) y genera una interrupción del sistema. Si configuramos esta recarga para que esta interrupción suceda a un intervalo regular (cada $1\text{ ms}$ es lo más habitual), se obtiene el \emph{tick} sobre el cual se construyen varias funcionalidades:
+
+        \begin{itemize}
+            \item \textbf{Marcas de tiempo:} Permite implementar contadores de milisegundos desde el arranque (como la función \texttt{millis()}) para medir tiempos transcurridos o gestionar \emph{timeouts} sin congelar la ejecución del hilo principal del procesador. Esto se hace manteniendo una variable que se incrementa en cada \emph{tick}, la cual se comprueba para ver si toca realizar alguna función.
+            \item \textbf{Planificación en RTOS:} En sistemas operativos en tiempo real, la interrupción del \emph{ticker} es aprovechada por el \emph{scheduler} para realizar cambios de contexto entre tareas, gestionar tiempos de espera (\emph{delays}) y controlar recursos.
+        \end{itemize}
+
+        Al estar acoplado al núcleo, y generalmente tratarse de una interrupción de alta prioridad, se garantiza que esta gestión temporal no se vea afectada por otras configuraciones.
+
+    \subsection{Temporizadores}
+
+        Mientras que el \emph{ticker} atiende necesidades del núcleo, los \textbf{temporizadores de propósito general} (\emph{Timers}) son periféricos independientes orientados a la interacción con el entorno externo y el hardware. En esencia, los temporizadores son contadores que se incrementan o decrementan según una fuente de pulsos de reloj, y son capaces de disparar interrupciones al cumplir ciertas condiciones sus valores. Casi cualquier temporizador genérico consta de tres componentes principales:
+
+        \begin{enumerate}
+            \item \textbf{Prescalador (PSC):} Es un divisor de frecuencia previo al contador. Si el reloj de entrada es de $84\text{ MHz}$, un prescalador ajustado a $84$ hará que el contador aumente a una frecuencia de exactamente $1\text{ MHz}$ (cada $1\ \mu\text{s}$).
+            \item \textbf{Contador (CNT):} Registro central que almacena el valor numérico actual del recuento.
+            \item \textbf{Registro de auto-recarga (ARR / Period):} Establece el límite máximo de cuenta. Cuando $CNT = ARR$, el contador se reinicia a cero.
+        \end{enumerate}
+
+        La frecuencia final de reinicios (o eventos) ($f_{\text{evento}}$) viene dada por la ecuación:
+
+        $$f_{\text{evento}} = \frac{f_{\text{CLK}}}{(PSC + 1) \cdot (ARR + 1)}$$
+
+        Gracias a la inclusión de canales de captura y comparación (\emph{Capture/Compare}), los temporizadores pueden operar de diversas formas autónomas:
+
+        \begin{itemize}
+            \item \textbf{Modo Comparación y PWM (\emph{Pulse Width Modulation}):} El valor actual del contador se compara continuamente con un valor almacenado en un registro de comparación (\emph{CCR}). Cuando $CNT < CCR$, una pin de salida digital se mantiene en estado alto, y cuando $CNT \ge CCR$, pasa a estado bajo. Modificando el registro $CCR$ se controla el ancho del pulso (ciclo de trabajo) para regular la potencia de motores, la intensidad de LEDs o sintetizar señales analógicas.
+            \item \textbf{Captura de entrada (\emph{Input Capture}):} Ante un flanco de subida o bajada en un pin externo (interrupción), el valor del contador en ese preciso instante se copia  a un registro de captura. Esto permite medir con precisión de microsegundos la duración de un pulso externo, medir frecuencias o interpretar sensores ultrasónicos y receptores de radiofrecuencia.
+            \item \textbf{Temporizadores de supervisión (\emph{Watchdog}):} Son temporizadores de seguridad cuya función es reiniciar el sistema si el software se bloquea en un bucle infinito. La aplicación debe "alimentar" periódicamente al \emph{watchdog}; si el contador alcanza el límite, se asume un fallo catastrófico y se fuerza un reinicio.
+            \item \textbf{Temporizadores estándar:} Simplemente esperan el tiempo configurado en el temporizador para generar una interrupción. Por ejemplo son utilizados para eliminar rebotes de teclas, generar animaciones en pantallas...
+        \end{itemize}
+
+    \subsection{RTC (\emph{Real-Time Clock})}
+
+        El Reloj en Tiempo Real o \textbf{RTC} mantiene la hora de calendario (segundos, minutos, horas, día, mes y año) de forma ininterrumpida. A diferencia de un temporizador convencional diseñado para medir lapsos breves en escala de microsegundos, el RTC es capaz de medir tiempo a largo plazo y con un consumo de energía extremadamente bajo. Esto es útil para generar eventos diarios, semanales, mensuales... mientras que el resto del tiempo, el procesador puede entrar en modos de bajo consumo y ahorrar batería.
+
+        Para cumplir su cometido, el RTC necesita:
+
+        \begin{itemize}
+            \item \textbf{Fuente de reloj de ultra bajo consumo:} Generalmente alimentado por un oscilador LSE de $32.768\text{ kHz}$. Esta frecuencia no es casual: $32768 = 2^{15}$, lo que permite utilizar un divisor binario de 15 etapas para rebajar la frecuencia a $1\text{ Hz}$ (un segundo) con una corriente del orden de los nanoamperios.
+            \item \textbf{Dominio de respaldo (\emph{Backup Domain}):} El módulo RTC suele ubicarse en una zona del procesador con su propia alimentación, que no se desconecta aunque se apague el procesador. Esto permite que el calendario siga avanzando aunque el resto del procesador esté apagado. Adicionalmente, ciertas zonas de memoria también se encuentran en este dominio, para que al arrancar de nuevo el procesador, los datos no se hayan perdido.
+        \end{itemize}
+
+        Normalmente, el RTC lleva la cuenta del tiempo en segundos, minutos, horas, días y años, en lugar de tener un único contador global. Internamente gestiona las sumas utilizando BCD.
+
+        Además del seguimiento del tiempo pasivo, el RTC incluye funciones como alarmas para despertar al procesador de modos de bajo consumo profundo en fechas/horas programadas.
+
+
+\end{document}

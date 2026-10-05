@@ -69,6 +69,7 @@
 
         \textbf{Alineación de memoria:} Es imprescindible respetar los huecos de direcciones no utilizadas mediante miembros de relleno (\texttt{RESERVED}), garantizando que cada miembro de la estructura coincida exactamente con la dirección del registro físico correspondiente. También hay que tener cuidado si se utilizan miembros de tipos cortos como \lstinline|uint16_t| o \lstinline|uint8_t|, ya que el compilador podría introducir huecos por su propia cuenta para que variables completas de tipo \lstinline|uint32_t| estén alineadas a direcciones múltiplo de cuatro. Normalmente esto no es un problema, pero conviene tenerlo en cuenta.
 
+
     \subsection{Utilización de \lstinline|union| y campos de bits}
 
         Aunque las operaciones bit a bit con máscaras (\lstinline|&|, \lstinline|||) son el estándar industrial, \texttt{C} permite mapear campos de bits (\emph{bit-fields}) mediante \lstinline|struct| dentro de una \lstinline|union|. Esto habilita el acceso individual a un bit o grupo de bits sin requerir desplazamientos explícitos.
@@ -98,6 +99,95 @@
             \end{lstlisting}
 
         \textbf{Advertencia sobre portabilidad:} La especificación del estándar \texttt{C} deja a criterio de la implementación del compilador la ordenación de los campos de bits (de LSB a MSB o viceversa) y el empaquetado en memoria. Además, modificar un campo de bits genera internamente una secuencia *Read-Modify-Write* no atómica, lo que puede derivar en condiciones de carrera si el registro es accedido simultáneamente por una ISR.
+
+    \subsection{Registros mayores al tamaño de palabra}
+
+        Generalmente, los registros de los periféricos serán de 32 bits, con diferentes funciones para cada bit que podremos configurar, de manera sencilla, activando o desactivando dichos bits. En ocasiones, es posible encontrar periféricos con registros donde el tamaño es mayor al de palabra, y por tanto para manejar su funcionamiento, debemos movernos no sólo en los bits de un registro, sino a través de varios registros. Considera por ejemplo el siguiente código:
+
+        \begin{lstlisting}
+            typedef struct {
+                volatile uint32_t ISER[8];
+                ...
+                volatile uint32_t ICER[8];
+                ...
+            } NVIC;
+        \end{lstlisting}
+
+        En este caso, el registro \REG{ISER} o \REG{ICER} tienen 256 bits de ancho (para gestionar, a través de cada uno, las diferentes fuentes de interrupción del sistema). Si queremos modificar la fuente 71, ¿cómo lo hacemos? 
+
+        Si miramos los registros, veremos que en \texttt{ISER[0]} están los primeros 32 bits (0-31), en \texttt{ISER[1]} los sigientes (32-63), en \texttt{ISER[2]} los siguientes (64-95) y así sucesivamente. Por ejemplo, el bit 71 de \texttt{ISER} será, de manera equivalente, el bit 7 de \texttt{ISER[2]}. Dicho de otra manera, el resultado de \textbf{dividir} el bit entre el número de bits por sub-registro nos dará el índice de sub-registro, y el resto de dicha división será la posición a modificar dentro de ese registro. Podemos verlo en la \Cref{fig:nvic_iser_diagram}.
+
+        Tanto la división como el resto, al ser generalmente el divisor una potencia de dos, se pueden hacer con simples desplazamientos y máscaras bit a bit.
+
+        \begin{figure}[htbp]
+            \centering
+            \begin{tikzpicture}[
+                node distance = 0.35cm,
+                regbox/.style = {draw=black!70, fill=gray!10, minimum width=4.5cm, minimum height=0.6cm, font=\small\ttfamily, align=center, rounded corners=2pt},
+                activebox/.style = {draw=blue!80!black, fill=blue!15, thick, minimum width=4.5cm, minimum height=0.6cm, font=\small\ttfamily, align=center, rounded corners=2pt},
+                bitcell/.style = {draw=black!60, fill=white, minimum width=0.6cm, minimum height=0.55cm, font=\tiny\ttfamily, align=center},
+                targetcell/.style = {draw=orange!90!black, fill=orange!35, thick, minimum width=0.6cm, minimum height=0.55cm, font=\tiny\bfseries\ttfamily, align=center}
+            ]
+
+                % === COLUMNA IZQUIERDA: Arreglo de Registros ===
+                
+                \node[regbox] (iser0) {\textbf{ISER[0]} \scriptsize(Bits 0..31)};
+                \node[above=0.1cm of iser0, font=\footnotesize\bfseries\sffamily, color=gray!80!black] {Registro \texttt{ISER[8]}};
+                \node[regbox, below=of iser0] (iser1) {\textbf{ISER[1]} \scriptsize(Bits 32..63)};
+                \node[activebox, below=of iser1] (iser2) {\textbf{ISER[2]} \scriptsize(Bits 64..95)};
+                \node[below=0.15cm of iser2, font=\small] (dots) {\vdots};
+                \node[regbox, below=0.15cm of dots] (iser7) {\textbf{ISER[7]} \scriptsize(Bits 224..255)};
+
+                % === COLUMNA DERECHA: Desglose de ISER[2] ===
+                \coordinate (right_col) at ($(iser1.east) + (3.5, -0.3)$);
+
+                % Casillas de bits individuales dentro de ISER[2]
+                \node[bitcell] at ($(right_col) + (-1.8, 0)$) (b31) {31};
+                \node[font=\tiny] at ($(right_col) + (-1.2, 0)$) (dots1) {\dots};
+                \node[bitcell] at ($(right_col) + (-0.6, 0)$) (b8) {8};
+                \node[targetcell] at ($(right_col) + (0.0, 0)$) (b7) {7};
+                \node[bitcell] at ($(right_col) + (0.6, 0)$) (b6) {6};
+                \node[font=\tiny] at ($(right_col) + (1.2, 0)$) (dots2) {\dots};
+                \node[bitcell] at ($(right_col) + (1.8, 0)$) (b0) {0};
+
+                % Título del desglose
+                \node[above=0.7cm of b7, font=\footnotesize\bfseries\sffamily, color=blue!90!black] {Desglose interno de \texttt{ISER[2]} (32 bits)};
+
+                % Etiquetas MSB / LSB y mapa global
+                \node[above=0.05cm of b31, font=\tiny\sffamily\bfseries, color=gray!70!black] {MSB};
+                \node[above=0.05cm of b0, font=\tiny\sffamily\bfseries, color=gray!70!black] {LSB};
+
+                \node[below=0.08cm of b31, font=\tiny\sffamily, color=gray!80!black] {Bit 95};
+                \node[below=0.08cm of b8, font=\tiny\sffamily, color=gray!80!black] {Bit 72};
+                \node[below=0.08cm of b7, font=\tiny\bfseries\sffamily, color=orange!90!black] {Bit 71};
+                \node[below=0.08cm of b6, font=\tiny\sffamily, color=gray!80!black] {Bit 70};
+                \node[below=0.08cm of b0, font=\tiny\sffamily, color=gray!80!black] {Bit 64};
+
+                % Líneas de proyección (efecto zoom)
+                \draw[dashed, color=blue!60!black] (iser2.north east) -- (b31.north west);
+                \draw[dashed, color=blue!60!black] (iser2.south east) -- (b0.south east);
+
+                % Indicador hacia el Bit 7
+                \draw[<-, thick, orange!90!black] (b7.north) -- ++(0, 0.45) 
+                    node[above, font=\tiny\bfseries\sffamily, color=orange!90!black] {Posición relativa: Bit 7};
+
+                % === BLOQUE MATEMÁTICO ===
+                \node[draw=gray!30, fill=green!5, rounded corners=3pt, below right=0.85cm and -1.3cm of b7, text width=6.5cm, align=left, font=\small\sffamily] (math) {
+                    \textbf{Acceso a la fuente 71:}\\[3pt]
+                    $\bullet$ \textbf{Índice de sub-registro:}\\
+                    \hspace*{1em} $\lfloor 71 / 32 \rfloor = 71 \gg 5 = \mathbf{2} \implies \text{\texttt{ISER[2]}}$\\[2pt]
+                    $\bullet$ \textbf{Desplazamiento (Bit):}\\
+                    \hspace*{1em} $71 \bmod 32 = \text{\texttt{71 \& 0x1f}} = \mathbf{7} \implies \text{Bit } 7$\\[4pt]
+                    \textbf{Operación en C:}\\
+                    \lstinline!NVIC->ISER[71>>5] |= (1U << (71&0x1f));!
+                };
+
+            \end{tikzpicture}
+            \caption{Esquema de direccionamiento de interrupciones en el registro \texttt{ISER[8]}.}
+            \label{fig:nvic_iser_diagram}
+        \end{figure}
+
+        También cabe la posibilidad de que estos registros múltiples no tengan necesariamente un único bit por función. En estos casos, deberemos de igual manera calcular, en primer lugar, el sub-registro correspondiente mediante una división y, en un segundo lugar, el rango de bits dentro de ese sub-registro que queremos modificar mediante un módulo. 
 
     \subsection{Palabra clave \lstinline|static|}
         
