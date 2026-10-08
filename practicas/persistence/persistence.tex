@@ -33,7 +33,8 @@
             \begin{lstlisting}
                 int main(void)
                 {
-                    // Inicializaciones
+                    // Inicializaciones de periféricos 
+                    // para el display, panel, systick,...
 
                     if (UserButton_IsPressed()) {
                         // Borrar memoria persistente
@@ -49,7 +50,10 @@
 
                     while (1) {
                         // Lógica de actualización de la pantalla
-                        // Save new touch coordinates into Flash
+                        // Si hubo interrupción de pantalla
+                        // Guardar coordenada en memoria volátil (variable) 
+                        // y pintar en pantalla
+                        
                         if (UserButton_IsPressed()) {
                             // Guardar coordenada en memoria persistente
                         }
@@ -151,7 +155,7 @@
             Ahora, si queremos escribir, el proceso será ligeramente distinto. Por el momento, ya que no vamos a escribir demasiada información, vamos a ir byte a byte, pero la función se puede adaptar para escribir posteriormente en bloques, sin necesidad de bloquear y desbloquear con cada transferencia de información. De nuevo trabajamos con el registro \REG{CR} para, en este caso, habilitar la escritura. Observemos también la secuencia para escribir: lo vamos a hacer directamente escribiendo en la dirección de memoria requerida (de la misma forma que lo hacíamos en las prácticas iniciales). El controlador de la \PER{FLASH} recibirá el dato y, tras ello, lo escribirá. Como puede tardar varios ciclos, forzamos mediante primitivas el vaciado de los \emph{store buffers}, y hacemos una espera a que el periférico nos confirme que ha terminado:
 
             \begin{lstlisting}
-                static void inline  Flash_WriteByte(uint32_t address, uint8_t data) {
+                static void inline Flash_WriteByte(uint32_t address, uint8_t data) {
                     Flash_Unlock();
 
                     // ... completar Ajustar el tamaño de transferencia PSIZE a '00'

@@ -8,6 +8,7 @@ Bienvenido al sitio web del material de la asignatura de Programación de Sistem
 * 📄 [3 - Enlazado e inicialización](teoria/linking/linking.pdf)
 * 📄 [4 - Interrupciones, barreras y callbacks](teoria/interrupts/interrupts.pdf)
 * 📄 [5 - Periféricos](teoria/peripherals/peripherals.pdf)
+* 📄 [6 - Temporización](teoria/timing/timing.pdf)
 
 ## 🛠️ [Prácticas](practicas/main.pdf)
 * 📁 [Punto de entrada a las prácticas](practicas/practicas.md)

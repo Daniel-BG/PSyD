@@ -25,7 +25,7 @@
 
         En concreto, observando dicha imagen, vemos que el display (a la izquierda) se conecta con la placa a través de GPIOs, y un periférico interno conocido como \PER{FMC}. El \PER{FMC} o \emph{Flexible Memory Controller} (\REFMAN[12]) es un periférico que permite gestionar la conexión con memorias externas de diferentes tipos (SDRAM, NAND flash, PSRAM, NOR flash...) además de dispositivos basados en memorias, como los displays (que guardan la imagen de manera similar a como una memoria guarda datos). Esto libera la memoria interna del \MCU para poder guardar programas, en lugar de pesadas imágenes.
         
-        Dichas conexiones requieren el manejo simultáneo de múltiples pines de entrada y salida, lo cual sería imposible de realizar directamente con el procesador. Por tanto, este periférico \PER{FMC} permite, con una configuración apropiada, gestionar las transferencias de datos de manera autónoma. Podemos efectivamente comprobar que efectivamente el display está conectado al \PER{FMC} observando \BRDMAN[5.14]. Adicionalmente, en \BRDMAN[6.7], nos dice qué pines se utilizan para las conexiones. (Estos nombres no son directamente los puertos GPIO de la placa, que se pueden consultar en \BRDMAN[Table 19].) Cruzando estos datos con \REFMAN[12.3], podemos ver qué señales concretas se utilizan para esta placa concreta.
+        Dichas conexiones requieren el manejo simultáneo de múltiples pines de entrada y salida, lo cual sería imposible de realizar directamente con el procesador. Por tanto, este periférico \PER{FMC} permite, con una configuración apropiada, gestionar las transferencias de datos de manera autónoma. Podemos efectivamente comprobar que el display está conectado al \PER{FMC} observando \BRDMAN[5.14]. Adicionalmente, en \BRDMAN[6.7], nos dice qué pines se utilizan para las conexiones. (Estos nombres no son directamente los puertos GPIO de la placa, que se pueden consultar en \BRDMAN[Table 19].) Cruzando estos datos con \REFMAN[12.3], podemos ver qué señales concretas se utilizan para esta placa concreta.
 
         Pero hay una peculiaridad, y es que el \PER{FMC} en este caso no se comunica directamente con el display, sino que, de por medio, hay un chip controlador \LCDMAN. Este chip está encargado de recibir comandos a través del \PER{FMC}, configurando la memoria del display, así como sus características. Así pues, toda la información o comandos que queramos pasar al display deberán pasar por el \PER{FMC}.
 
@@ -95,7 +95,7 @@
 
             El periférico \PER{FMC} funciona, a ojos del programador, como una extensión de la memoria RAM del sistema. En lugar de requerir un protocolo de comunicación complejo con llamadas a funciones de transmisión bit a bit, el \PER{FMC} mapea el controlador externo directamente en el mapa de memoria del microcontrolador (\REFMAN[12.4]).
 
-            Esto significa que escribir o leer en el controlador de pantalla es tan sencillo como hacer una operación de escritura en una dirección de memoria (\emph{pointer dereferencing}) en C. El propio hardware del \PER{FMC} se encarga de traducir esa escritura en las señales eléctricas apropiadas (bus de datos, activación de \texttt{CS}, pulsos de \texttt{WR/RD}, etc.) a través de los pines GPIO asignados. En este caso, únicamente se mapean dos direcciones: \texttt{REG} (para indicar el registro o comando del periférico) y \texttt{RAM} (para indicar el valor que se escribe):
+            Esto significa que escribir o leer en el controlador de pantalla es tan sencillo como hacer una operación de escritura en una dirección de memoria en C. El propio hardware del \PER{FMC} se encarga de traducir esa escritura en las señales eléctricas apropiadas (bus de datos, activación de \texttt{CS}, pulsos de \texttt{WR/RD}, etc.) a través de los pines GPIO asignados. En este caso, únicamente se mapean dos direcciones: \texttt{REG} (para indicar el registro o comando del periférico) y \texttt{RAM} (para indicar el valor que se escribe):
 
             \begin{lstlisting}
                 typedef struct
@@ -121,7 +121,7 @@
                 }
             \end{lstlisting}
 
-            Para comunicarse con el \LCDMAN, el \PER{FMC} utiliza una interfaz de tipo 8080/6800 paralela de tipo SRAM. En esta interfaz, hay una línea de control crítica conocida como A0 (o Data/Command) (\BRDMAN[Table 14]):
+            Para comunicarse con el \LCDMAN, el \PER{FMC} utiliza una interfaz de tipo 8080/6800 paralela de tipo SRAM. Ésta contiene líneas que doblan para datos o comandos, y su información se discierne mediante una línea especial A0 (o Data/Command Line) (\BRDMAN[Table 14]):
             \begin{itemize}
                 \item Cuando la línea A0 está a nivel bajo (\texttt{0}), la transferencia se interpreta como un comando o instrucción para el controlador.
                 \item Cuando la línea A0 está a nivel alto (\texttt{1}), la transferencia se interpreta como datos (parámetros del comando o colores de los píxeles).
@@ -252,7 +252,7 @@
             }
         \end{lstlisting}
 
-        Yendo por orden, lo primero es inicializar el panel LCD. Lo primero es configurar los pines de conexión directa (de reset, interrupción (que no utilizaremos) y luz trasera). Posteriormente, aplicaremos la secuencia de inicialización del panel.
+        Yendo por orden, lo primero es inicializar el panel LCD. Para ello hay que configurar los pines de conexión directa (de reset, interrupción (que no utilizaremos) y luz trasera). Posteriormente, aplicaremos la secuencia de inicialización del panel.
 
         \begin{lstlisting}
             void LCD_Pins_Init() {
