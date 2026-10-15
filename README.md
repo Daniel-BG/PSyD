@@ -26,8 +26,8 @@ Bienvenido al sitio web del material de la asignatura de Programación de Sistem
 * 📁 [Enunciado de la Práctica 11 - Thingsboard - Control](practicas/thingsboard_data_control/thingsboard_data_control.pdf)
 * 📁 [Enunciado de la Práctica 12 - Thingsboard - OTA](practicas/thingsboard_ota/thingsboard_ota.pdf)
 * 📁 [Enunciado de la Práctica 13 - BSP automatizado con cubeMX](practicas/automated_bsp_cubemx/automated_bsp_cubemx.pdf)
+* 🏁 [Proyecto final - práctica libre](practicas/final_project/final_project.pdf)
 
-## 🏁 [Proyecto final - práctica libre](practicas/final_project/final_project.pdf)
-
-## 📝 [Colección de preguntas de examen (enunciados)](examenes/main_preguntas.pdf)
-## 💯 [Colección de preguntas de examen (soluciones)](examenes/main_soluciones.pdf)
+## 📝 Colección de preguntas de examen
+* ❓ [Sólo enunciados](examenes/main_preguntas.pdf)
+* 💯 [Con soluciones](examenes/main_soluciones.pdf)
