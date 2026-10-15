@@ -29,4 +29,5 @@ Bienvenido al sitio web del material de la asignatura de Programación de Sistem
 
 ## 🏁 [Proyecto final - práctica libre](practicas/final_project/final_project.pdf)
 
-## 📝 [Colección de preguntas de examen](examenes/main.pdf)
+## 📝 [Colección de preguntas de examen (enunciados)](examenes/main_preguntas.pdf)
+## 💯 [Colección de preguntas de examen (soluciones)](examenes/main_soluciones.pdf)

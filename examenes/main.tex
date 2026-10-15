@@ -1,5 +1,17 @@
 \documentclass[svgnames,spanish,11pt,a4paper]{article}
 
+\ifdefined\showsolutions
+  \usepackage[nosolutionfiles]{answers} % Muestra las soluciones en línea
+\else
+  \usepackage{answers}                  % Guarda soluciones en archivo externo (ocultas en el PDF)
+\fi
+
+\newcounter{solution}
+\newenvironment{ssolution}{\refstepcounter{solution} {\bfseries Solución}: \begin{em}}{\end{em}}
+\renewcommand{\solutionextension}{sol}
+\Opensolutionfile{solutions}
+\Newassociation{solution}{ssolution}{solutions}
+
 % PACKAGES AND STUFF
 \input{../common/includes}
 
@@ -39,5 +51,73 @@
 
     En construcción...
 
+
+    \begin{enumerate}
+        \item ¿Qué efecto produce en la compilación calificar un puntero a un registro con la palabra clave \lstinline|volatile| en lenguaje C?
+
+            \begin{solution}
+                Al nombrarlo como \lstinline|volatile|, le decimos al compilador que su valor podría cambiar por fuentes ajenas al programa (por ejemplo el propio periférico). Por tanto, no debería realizar optimizaciones basadas en suposiciones sobre su valor, leyéndolo siempre que lo necesite directamente desde memoria.
+            \end{solution}
+
+        \item Escriba una función en C \lstinline|void gpio_set_mode(GPIO_TypeDef *GPIOx, uint32_t pin, uint32_t mode)| que configure de forma atómica a nivel de software el modo de un pin en el registro \REG{MODER} (donde cada pin ocupa 2 bits). Asegúrese de limpiar primero la configuración previa mediante máscaras binarias antes de aplicar el nuevo modo
+        
+            \begin{solution}
+                \begin{lstlisting}
+                    static inline void gpio_set_mode(GPIO_TypeDef *GPIOx, uint32_t pin, GPIO_Mode_t mode) {
+                        uint32_t temp = GPIOx->MODER;
+                        temp &= ~(0b11U << (pin * 2));
+                        temp |= ((uint32_t)mode << (pin * 2));
+                        GPIOx->MODER = temp;
+                    }
+                \end{lstlisting}
+            \end{solution}
+
+        \item En el microcontrolador STM32F723, el controlador de interrupciones NVIC maneja registros vectorizados como \REG{ISER} (Interrupt Set Enable Register), definidos dentro del \lstinline|struct| del periférico como un array \lstinline|volatile uint32_t ISER[8]| para cubrir hasta 256 líneas de interrupción. Explique matemáticamente cómo se traduce un número global de línea de interrupción \texttt{IRQn} (por ejemplo, 71) a un índice dentro del array \lstinline|ISER[]| y a una posición de bit dentro de ese elemento de 32 bits.
+        
+            \begin{solution}
+                Al ser cada elemento del array una palabra de 32 bits, las línea de interrupción se distribuyen en bloques contiguos de 32 líneas.
+                
+                El índice del registro es la parte entera de la división por 32: $\lfloor N / 32 \rfloor$. En operaciones de desplazamiento de bits equivale a $N \gg 5$. En nuestro ejemplo, $71 \gg 5 = 2$ (corresponde a \REG{ISER[2]}).
+
+                La posición del bit dentro del registro de 32 bits es el resto de la división: $N \pmod{32}$. En operaciones bit a bit equivale a $N \ \& \ 0\text{x1F}$ ($N \ \& \ 31$).
+            \end{solution}
+
+        \item ¿Qué sucede al intentar modificar los registros de control de un periférico (por ejemplo \PER{GPIOA}) si no se ha activado previamente su reloj en el registro \PER{RCC} correspondiente? (En este caso, \REG{RCC\_AHB1ENR})
+
+            \begin{solution}
+                Como el periférico y sus registros no están recibiendo señal de reloj, no actualizarán sus valores y por tanto las escrituras habrán sido en vano.
+            \end{solution}
+
+        \item Si la frecuencia de reloj de entrada del periférico \PER{USART6} es de $16\text{ MHz}$ y se requiere una velocidad de $115200\text{ baudios}$ ¿qué valor entero (aproximadamente) debe cargarse en el registro \REG{USART6\_BRR}?
+        
+            \begin{solution}
+                Para reducir la velocidad de reloj de entrada a la objetivo (los baudios) debemos utilizar un divisor de reloj. En este caso, el valor que le damos está en el registro \REG{BRR}. El valor $v_{BRR}$ necesario será:
+
+                \[
+                    v_{BRR} = \frac{f_{in}}{baud rate} = \frac{16\cdot 10^6}{115200} \approx 139
+                \]
+            \end{solution}
+
+        \item El gestor de interrupciones externas \PER{EXTI} tiene sólo unas pocas líneas (en concreto 16), muchas menos que la totalidad de pines de los que dispone el procesador (16 pines por puerto, en 10 puertos diferentes). ¿Cuántos pines puedo utilizar simultáneamente para interrumpir al procesador? ¿Qué restricciones existen?
+        
+            \begin{solution}
+                \PER{EXTI} multiplexa los pines de entrada, colocando todos los pines "0" (PA0, PB0, PC0,...) en la línea \texttt{EXTI0}, y así sucesivamente. Por tanto, el máximo de pines utilizables para interrumpir es de 16. La restricción existente es que nunca podremos utilizar dos pines con el mismo número (por ejemplo PA0 y PB0) a la vez, ya que comparten línea. Sí es posible sin embargo utilizar todos los pines de un puerto a la vez (PA0, PA1, PA2...) ya que cada uno va a una línea diferente.
+            \end{solution}
+
+        \item En el código de inicialización del procesador, se definen todas las rutinas de tratamiento de interrupción. Por defecto, todas ellas apuntan a la misma función llamada \texttt{Default\_Handler}. ¿Cómo se consigue cambiar esto al redefinir una ISR manualmente? ¿Por qué no se sigue apuntando a \texttt{Default\_Handler}?
+        
+            \begin{solution}
+                Aunque por defecto se apunte a \texttt{Default\_Handler}, su puntero está definido como \texttt{.weak}. Esto quiere decir que cualquier redefinición del mismo ganará prioridad sobre la original. Por tanto, al redefinirlo, conseguimos que el enlazador apunte a la nueva función en lugar de la antigua.
+            \end{solution}
+
+    \end{enumerate}
+
+
+    %UART
+    %I2C
+    %linker script
+
+
+    \Closesolutionfile{solutions}
 
 \end{document}
