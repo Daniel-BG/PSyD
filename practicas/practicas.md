@@ -92,3 +92,8 @@ La creación manual de los BSP tiene la gran ventaja de utilizar única y exclus
 ---
 
 
+## [Práctica Final](final_project/final_project.pdf) - Práctica Libre
+
+Conocido gran parte del ecosistema y opciones que nos ofrece la placa y el procesador, ahora toca demostrar que sabemos utilizarlo. Para esta práctica se proponen una serie de requisitos mínimos, a partir de los cuales se puede desarrollar cualquier proyecto que se os ocurra. En este aspecto, el límite es vuestra imaginación. Se recomienda en cualquier caso consultar la idea con vuestro profesor para verificar que cumple con dichos requisitos, y evitar que se haga demasiado extensa o corta. Aunque se proponen algunas ideas para quienes no se les ocurra nada, la recomendación es buscar un proyecto personal y único.
+
+---

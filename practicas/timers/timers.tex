@@ -113,10 +113,10 @@
             static inline void TIM_SET_PRESCALER(volatile TIM_TypeDef *TIMx, uint32_t value);
             //... configura el registro ARR con el valor de autoreload
             static inline void TIM_SET_AUTO_RELOAD(volatile TIM_TypeDef *TIMx, uint32_t value);
-            //... activa las interrupciones en el registro DIER
+            //... activa la interrupción UIE en el registro DIER
             static inline void TIM_ENABLE_INT(volatile TIM_TypeDef *TIMx);
             //funciones de uso
-            //... borra el flag pendiente del registro SR
+            //... borra el flag pendiente del registro SR (correspondiente a UIE)
             static inline void TIM_CLEAR_FLAG(volatile TIM_TypeDef *TIMx);
             //... comprueba si hay flag pendiente en el registro SR
             static inline uint32_t TIM_CHECK_FLAG(volatile TIM_TypeDef *TIMx);

@@ -1,0 +1,159 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\ifSubfilesClassLoaded{\setcounter{numpractica}{7}}{}
+
+\practica{Proyecto final - Práctica Libre}
+
+    \subsection{Objetivos}
+
+        \begin{itemize}
+            \item Realizar un proyecto para la placa \BOARD de manera autónoma, utilizando varias de sus capacidades de manera simultánea.
+            \item Demostrar el conocimiento sobre la asignatura mediante una presentación individual del proyecto.
+        \end{itemize}
+
+    \subsection{Requisitos de la práctica}
+
+        Es necesario para presentar la práctica cumplir con unos requisitos mínimos de desarrollo. Es recomendable comunicar previo al desarrollo la idea al profesor, para asegurarse de que se pueden cumplir los requisitos. El cumplimiento estricto de los mismos no garantiza la nota, pues ésta vendrá de una presentación individual del mismo.
+
+        Los requisitos mínimos para la práctica son los siguientes:
+
+        \begin{itemize}
+            \item Utilizar la pantalla, tanto para mostrar información, como para recoger pulsaciones a través del panel táctil.
+            \item Utilizar interrupciones para al menos dos periféricos o líneas diferentes.
+            \item Contar con persistencia para guardar algún tipo de configuración de usuario.
+            \item Evitar las esperas activas salvo, como mucho, para el bucle \texttt{main}.
+        \end{itemize}
+
+        Opcionalmente, se pueden integrar:
+
+        \begin{itemize}
+            \item Un sistema operativo de tiempo real o algún sistema de multitarea.
+            \item Conectividad Wifi para control o actualizaciones remotas.
+            \item Nuevos periféricos externos conectados mediante los pines de expansión.
+        \end{itemize}
+
+        Para la presentación, se espera que el estudiante sea capaz de demostrar el conocimiento sobre la totalidad del código desarrollado, entendiendo cómo funciona todo el sistema, tanto a nivel software como hardware. Además de presentar el proyecto, se hará una defensa donde el profesor preguntará, código en mano, por detalles de la práctica. Se deberá además preparar un pequeño documento (1-2 páginas) de manual de uso de la práctica, indicando cómo funciona el sistema, y añadiendo un diagrama de flujo que explique las interacciones entre los diversos elementos (periféricos, interrupciones, código, etc). Se añade un ejemplo del mismo en el \Cref{sub:project}.
+
+    \subsection{Ideas de desarrollo para la práctica final}
+
+        \begin{enumerate}
+            \item \textbf{Pulsera de actividad}: El proyecto propuesto consiste en desarrollar una pulsera de actividad capaz de monitorizar la actividad física. Deberá contar con al menos las siguientes características:
+                \begin{itemize}
+                    \item Visualizar iconos y textos en un LCD.
+                    \item Usar el touchpad para la interacción con el usuario.
+                    \item Leer señales biológicas (emuladas) y calcular indicadores de actividad física.
+                \end{itemize}
+
+            \item \textbf{Marco digital}: El proyecto propuesto consiste en desarrollar un marco digital que visualice un carrusel de fotos con efectos de transición. Deberá contar con al menos las siguientes características:
+                \begin{itemize}
+                    \item Implementar las transiciones entre fotos mediante DMA (\textbf{ojo! nuevo periférico}).
+                    \item Usar el touchpad para interactuar con el usuario.
+                    \item Visualizar imágenes y/o textos en un LCD.
+                \end{itemize}
+
+            \item \textbf{Ciclocomputador}: El proyecto propuesto consiste en desarrollar un ciclocomputador capaz de calcular y visualizar distintos parámetros de la carrera (velocidad, distancia, cronómetro, etc) en base al tren variable de pulsos que generaría un sensor de revolución ubicado en la rueda (que simulamos con el botón). Deberá contar con al menos las siguientes características:
+
+                \begin{itemize}
+                    \item Usar el panel táctil y LCD como mecanismos básicos para la interacción con el usuario.
+                    \item Visualizar menús e información de los datos generados
+                \end{itemize}
+
+            \item \textbf{Detector de posicionamiento}: El proyecto propuesto consiste en desarrollar una aplicación para identificar el origen de un sonido. Para ello se utilizará la matriz de cuatro micrófonos disponible en la placa. Se deberá capturar el sonido de todos ellos, y aplicando algún algoritmo de detección de patrones en el audio, averiguar cuándo éste llega a cada uno de ellos, para posicionar el origen. Deberá tener las siguientes características:
+            
+                \begin{itemize}
+                    \item Utilizar el panel táctil como interfaz del programa.
+                    \item Utilizar el panel LCD para visualizar el origen del sonido, mediante una línea desde el centro de la pantalla hacia donde se esté ubicando el mismo.
+                \end{itemize}
+
+            \item \textbf{Tu idea}: El proyecto propuesto consiste en desarrollar tu idea, con tus funcionalidades deseadas, para hacer algo que te guste y motive. Piensa en algo que se pueda aplicar en tus hobbies, que siempre hayas querido hacer, que te parezca un reto, o que sea lo suficientemente sencillo para cumplir los requisitos sin herniarte a programar.
+            
+        \end{enumerate}
+
+            
+    \newpage
+    \subsection{Ejemplo de documento final explicativo sobre la práctica}\label{sub:project}
+
+        \subsubsection{Manual de Usuario}
+
+            El proyecto \textbf{Detector de Posicionamiento por Sonido} permite identificar en tiempo real la dirección angular de procedencia de un evento sonoro, empleando los micrófonos de la placa. El sistema procesa los niveles y retardos de señal entre los diferentes canales de audio, dibujando dinámicamente un vector de posición en la pantalla LCD. La configuración de los diversos parámetros, así como la interacción con el sistema, se hace mediante la interfaz táctil de la pantalla.
+
+            \textbf{Guía de funcionamiento para el usuario:}
+
+            \begin{enumerate}
+                \item \textbf{Arranque e Inicialización:} Al encender la placa, el sistema carga los ajustes previos de la memoria Flash persistente (comprobando si existen). En caso contrario, establece valores por defecto. 
+                \item \textbf{Visualización en Pantalla LCD:} En el centro de la pantalla ($240 \times 240$ píxeles) se representa un indicador circular (brújula/radar). Al detectarse un sonido que supere el umbral configurado, se traza una línea desde el centro, orientada hacia la dirección estimada de la fuente sonora. Para el cálculo estimado de la dirección, se utiliza un algoritmo que compara la señal de las diferentes fuentes, detectando el desfase entre ellas y, en función del mismo, calculando la dirección de proveniencia.
+                \item \textbf{Control de la aplicacion:} En la parte inferior del LCD se disponen dos botones virtuales: \texttt{[-]} y \texttt{[+]}. El usuario puede pulsar sobre ellos para modificar el umbral de disparo de sonido en función del ruido ambiente. Al pulsar el botón físico del usuario, el nivel de sensibilidad actual se almacena de forma permanente en la Flash, confirmándose la operación mediante un parpadeo del LED verde.
+            \end{enumerate}
+
+
+
+        \subsubsection{Arquitectura del sistema}
+            
+            \begin{itemize}
+                \item \textbf{Interfaz Gráfica y Táctil (LCD + CTP):} La pantalla LCD ST7789H2 es controlada mediante el periférico paralelo \texttt{FMC} utilizando los drivers proporcionados de ejemplo en la práctica 7. El panel táctil capacitivo FT3x67 se gestiona a través del bus \texttt{I2C3}, utilizando igualmente el driver proporcionado en la práctica 8.
+                \item \textbf{Uso de Interrupciones:}
+                \begin{enumerate}
+                    \item \textbf{Interrupción EXTI0}: Recoge las pulsaciones del botón de usuario.
+                    \item \textbf{Interrupción EXTI9\_5}: Captura las pulsaciones mediante la línea de interrupción del panel táctil.
+                    \item \textbf{Interrupción de Temporización}: Dispara periódicamente el muestreo de los canales de sonido/audio y desencadena el cálculo del algoritmo de posicionamiento angular.
+                \end{enumerate}
+                \item \textbf{Persistencia de Datos en Memoria FLASH}: Se hace uso de las funciones desarrolladas en la práctica de persistencia, para desbloquear y escribir en el Sector 7 de la memoria Flash (\texttt{0x08060000}). En dicha dirección se guarda la información de sensibilidad mediante una estructura de datos diseñada a medida. Así se mantienen los valores aunque se apague la placa.
+                \item \textbf{Ausencia de Esperas Activas}: El bucle principal de la aplicación (\texttt{main}) entra continuamente en modo de bajo consumo mediante la instrucción ensamblador \texttt{\_\_asm volatile ("wfi")}. El procesador permanece dormido hasta que una interrupción lo despierta para procesar un evento.
+            \end{itemize}
+
+
+
+        \subsubsection{Diagrama de Flujo}
+            A continuación se muestra el diagrama de flujo del sistema, ilustrando la interacción entre las rutinas de servicio de interrupción (ISR), las periferias hardware, el hilo principal y la memoria persistente.
+
+            \begin{center}
+            \begin{tikzpicture}[
+                node distance=1.1cm and 1.2cm,
+                auto,
+                block/.style={rectangle, draw=blue!80, fill=blue!10, text centered, rounded corners, minimum height=2.2em, text width=3.3cm, font=\footnotesize},
+                isr/.style={rectangle, draw=red!80, fill=red!15, text centered, rounded corners, minimum height=2.2em, text width=3.3cm, font=\footnotesize},
+                hw/.style={ellipse, draw=green!80!black, fill=green!15, text centered, minimum height=2em, text width=2.8cm, font=\footnotesize},
+                line/.style={draw, ->, >=stealth, thick}
+            ]
+
+                % Componentes Hardware
+                \node [hw] (mic) {Micrófonos};
+                \node [hw, right=1cm of mic] (ctp) {Panel Táctil};
+                \node [hw, right=1cm of ctp] (button) {Botón};
+
+                % Rutinas ISR
+                \node [isr, below=of mic] (isr_audio) {\textbf{ISR TIM2 / Audio}\\Muestreo y almacenamiento de audio};
+                \node [isr, below=of ctp] (isr_touch) {\textbf{ISR EXTI9\_5}\\Captura de evento táctil};
+                \node [isr, below=of button] (isr_button) {\textbf{ISR EXTI0}\\Captura de botón usuario};
+
+                % Bucle Principal Main
+                \node [block, fill=yellow!25, draw=orange!80, below=1.8cm of isr_touch] (main) {\textbf{Bucle Principal Main}\\Modo Reposo \texttt{\_\_WFI()}\\Gestor de Eventos};
+
+                % Salidas / Periféricos
+                \node [block, left=of main] (lcd) {\textbf{LCD ST7789H2 (FMC)}\\Dibuja indicador y línea angular};
+                \node [block, right=of main] (flash) {\textbf{FLASH Sector 7}\\Guarda / Lee configuración};
+                \node [block, below=of main] (algorithm) {\textbf{Algoritmo posicionamiento}\\Calcula posición};
+
+                % Flujo
+                \path [line] (mic) -- node[right, font=\tiny]{Muestreo} (isr_audio);
+                \path [line] (ctp) -- node[right, font=\tiny]{INT PI9} (isr_touch);
+                \path [line] (button) -- node[right, font=\tiny]{INT PA0} (isr_button);
+
+                \path [line] (isr_audio) -- node[left, font=\tiny]{Flag nuevo dato} (main);
+                \path [line] (isr_touch) -- node[right, font=\tiny]{Flag Toque} (main);
+                \path [line] (isr_button) -- node[right, font=\tiny]{Flag Guardado} (main);
+
+                \path [line] (main) -- node[above, font=\tiny]{Update} (lcd);
+                \path [line] (main) -- node[above, font=\tiny]{Guardado} (flash);
+                \path [line] (main) -- node[above, font=\tiny]{Nuevos valores} (algorithm);
+
+            \end{tikzpicture}
+            \end{center}
+
+        
+
+        
+\end{document}
+
