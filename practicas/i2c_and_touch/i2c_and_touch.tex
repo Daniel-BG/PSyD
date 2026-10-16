@@ -14,306 +14,17 @@
 
     \subsection{Fundamentos teóricos}
         
-        Los procesadores tienen, por regla general, un gran número de pines disponibles para su conexión con dispositivos externos (de hecho, cuentan con varios miles en los modelos más avanzados). Sin embargo, esta disponibilidad tiene sus limitaciones: en primer lugar, no todos los pines son capaces de realizar todas las funciones. En segundo lugar, el uso de pines concretos requiere un grado de planificación del sistema completo a nivel de placa base. 
-        
-        Mucha veces querremos la posibilidad de conectar diferentes dispositivos a nuestro diseño, pero no necesariamente que éstos existan desde el comienzo. Por ejemplo, un microcontrolador sencillo puede utilizarse para controlar diferentes tipos de sensores, actuadores, pantallas, controles y, a nivel de diseño, sólo podremos ofrecer unos pocos pines al usuario.
+        Si bien los procesadores cuentan con periféricos internos con funcionalidades muy amplias (temporización, controles de memoria, interrupciones, protocolos básicos de comunicación...), hay ciertas funciones que no pueden tener integradas. Por ejemplo, sería muy complicado tener un periférico de pantalla integrado, ya que cada pantalla es un mundo y habría que limitar los dispositivos soportados. Lo mismo ocurriría con audio, teclados, ratones, actuadores...
 
-        Para tener la posibilidad de conectar multitud de dispositivos a nuestro procesador, existe el concepto de bus: protocolos que utilizan un conjunto reducido de pines, y permiten, a través de unas pocas líneas de datos, la interconexión de varios (en ocasiones hasta cientos) dispositivos.
+        Es decir, para actuar con el mundo "exterior" al procesador, no podemos contar con periféricos específicos. En su lugar, se suelen ofrecer periféricos genéricos que, utilizando protocolos estandarizados, se pueden conectar con una gran cantidad de elementos externos. Así, el trabajo de controlar esos periféricos externos será ahora del programador \emph{software}, mediante la escritura de los \emph{drivers} necesarios.
 
-        El \textbf{Bus I2C} (\emph{Inter-Integrated Circuit} es una de estas alternativas. Es de las más sencillas, y permite, a través de únicamente dos líneas, la conexión de hasta 1000 dispositivos. Los elementos más destacables del bus I2C pueden verse en la \Cref{fig:i2c_bus} y son:
-
-        \begin{figure}[hb]
-            \centering
-            \begin{tikzpicture}[
-                font=\sffamily\small,
-                % Estilos de los bloques
-                master box/.style={
-                    draw=blue!75!black,
-                    fill=blue!8,
-                    ultra thick,
-                    rounded corners=6pt,
-                    minimum width=3.2cm,
-                    minimum height=2.6cm
-                },
-                slave box/.style={
-                    draw=orange!85!black,
-                    fill=orange!8,
-                    ultra thick,
-                    rounded corners=6pt,
-                    minimum width=3.2cm,
-                    minimum height=2.6cm
-                },
-                resistor/.style={
-                    draw=black!80,
-                    fill=yellow!20,
-                    thick,
-                    minimum width=0.35cm,
-                    minimum height=0.35cm,
-                    font=\tiny\bfseries
-                },
-                pin label/.style={
-                    font=\tiny\bfseries,
-                    inner sep=1pt
-                }
-            ]
-
-                % --- COORDENADAS Y DE LAS LÍNEAS DEL BUS ---
-                \def\yVCC{4.2}
-                \def\ySDA{3.2}
-                \def\ySCL{2.2}
-                \def\yGND{1.2}
-
-                \def\xStart{-0.8}
-                \def\xEnd{11.8}
-
-                % --- LÍNEAS PRINCIPALES DEL BUS ---
-                \draw[red!80!black, ultra thick] (\xStart, \yVCC) -- (\xEnd, \yVCC) node[right=2pt, font=\bfseries\small] {VCC (+3.3V / +5V)};
-                \draw[blue!80!black, ultra thick] (\xStart, \ySDA) -- (\xEnd, \ySDA) node[right=2pt, font=\bfseries\small] {SDA (Serial Data)};
-                \draw[purple!80!black, ultra thick] (\xStart, \ySCL) -- (\xEnd, \ySCL) node[right=2pt, font=\bfseries\small] {SCL (Serial Clock)};
-                \draw[black!80, ultra thick] (\xStart, \yGND) -- (\xEnd, \yGND) node[right=2pt, font=\bfseries\small] {GND};
-
-                % --- RESISTENCIAS DE PULL-UP (I2C Open-Drain) ---
-                \def\xRone{0.2}
-                \def\xRtwo{0.9}
-
-                % Pull-up para SDA
-                \node[resistor] (R1) at (\xRone, \ySDA + 0.5) {$R_P$};
-                \draw[red!80!black, thick] (\xRone, \yVCC) -- (R1.north);
-                \draw[blue!80!black, thick] (R1.south) -- (\xRone, \ySDA);
-                \fill[red!80!black] (\xRone, \yVCC) circle (2.2pt);
-                \fill[blue!80!black] (\xRone, \ySDA) circle (2.2pt);
-
-                % Pull-up para SCL
-                \node[resistor] (R2) at (\xRtwo, \ySCL + 0.5) {$R_P$};
-                \draw[red!80!black, thick] (\xRtwo, \yVCC) -- (R2.north);
-                \draw[purple!80!black, thick] (R2.south) -- (\xRtwo, \ySCL);
-                \fill[red!80!black] (\xRtwo, \yVCC) circle (2.2pt);
-                \fill[purple!80!black] (\xRtwo, \ySCL) circle (2.2pt);
-
-                % --- DISPOSITIVOS (MASTER Y SLAVES) ---
-                % Master
-                \def\xM{2.8}
-                \node[master box] (master) at (\xM, -1.3) {};
-                \node[font=\bfseries, color=blue!80!black] at (\xM, -0.8) {MASTER};
-                \node[align=center, font=\scriptsize, color=gray!80!black] at (\xM, -1.5) {Controlador del Bus\\Genera Reloj (SCL)};
-
-                % Slave 1
-                \def\xSone{6.5}
-                \node[slave box] (slave1) at (\xSone, -1.3) {};
-                \node[font=\bfseries, color=orange!85!black] at (\xSone, -0.8) {SLAVE 1};
-                \node[align=center, font=\scriptsize, color=gray!80!black] at (\xSone, -1.5) {Dispositivo I2C\\Dir: 0x68};
-
-                % Slave 2
-                \def\xStwo{10.2}
-                \node[slave box] (slave2) at (\xStwo, -1.3) {};
-                \node[font=\bfseries, color=orange!85!black] at (\xStwo, -0.8) {SLAVE 2};
-                \node[align=center, font=\scriptsize, color=gray!80!black] at (\xStwo, -1.5) {Dispositivo I2C\\Dir: 0x3C};
-
-                % --- CONEXIONES DE PIN PREDETERMINADAS ---
-                \foreach \xDev in {\xM, \xSone, \xStwo} {
-                    \def\xVccPin{\xDev - 1.2}
-                    \def\xSdaPin{\xDev - 0.4}
-                    \def\xSclPin{\xDev + 0.4}
-                    \def\xGndPin{\xDev + 1.2}
-                    \def\yTop{0.0}
-
-                    % Conexiones verticales a los buses
-                    \draw[red!80!black, thick] (\xVccPin, \yTop) -- (\xVccPin, \yVCC);
-                    \draw[blue!80!black, thick] (\xSdaPin, \yTop) -- (\xSdaPin, \ySDA);
-                    \draw[purple!80!black, thick] (\xSclPin, \yTop) -- (\xSclPin, \ySCL);
-                    \draw[black!80, thick] (\xGndPin, \yTop) -- (\xGndPin, \yGND);
-
-                    % Puntos de unión en el bus
-                    \fill[red!80!black] (\xVccPin, \yVCC) circle (2pt);
-                    \fill[blue!80!black] (\xSdaPin, \ySDA) circle (2pt);
-                    \fill[purple!80!black] (\xSclPin, \ySCL) circle (2pt);
-                    \fill[black!80] (\xGndPin, \yGND) circle (2pt);
-
-                    % Etiquetas de los pines dentro de las cajas
-                    \node[pin label, red!80!black] at (\xVccPin, -0.2) {VCC};
-                    \node[pin label, blue!80!black] at (\xSdaPin, -0.2) {SDA};
-                    \node[pin label, purple!80!black] at (\xSclPin, -0.2) {SCL};
-                    \node[pin label, black!80] at (\xGndPin, -0.2) {GND};
-                }
-
-            \end{tikzpicture}
-            \caption{Diagrama de un bus I2C}
-            \label{fig:i2c_bus}
-        \end{figure}
-
-        \begin{itemize}
-            \item \emph{Master}: Un único dispositivo que tiene el control del bus, y genera las peticiones en el mismo. El \emph{Master} puede cambiar con ciertas señalizaciones especiales, pero siempre debe ser un único dispositivo.
-            \item \emph{Slave}: Pueden ser múltiples, son dispositivos que están conectados al bus y escuchan el mismo a la espera de peticiones del \emph{Master}.
-            \item \textbf{SDA} o \emph{Serial Data}: Línea de datos serie, a través de la cual se envía la información (bien del \emph{Master} al \emph{Slave} o viceversa).
-            \item \textbf{SCL} o \emph{Serial Clock}: Línea de reloj serie. Controlada por el \emph{Master}, lleva la señal de reloj con la que se sincronizan los datos de \textbf{SDA}. Generalmente, los dispositivos \textbf{I2C} permiten un amplio rango de frecuencias para su funcionamiento, aunque las más típicas son 100 o 400 KHz.
-        \end{itemize}
-
-        Un dato interesante a observar es el hecho de que tanto \textbf{SCL} como \textbf{SDA} tienen resistencia de \emph{pull-up} a VCC. Es decir, que por defecto están siempre a ``1''. Cualquier dispositivo que se conecte, operará en modo de \emph{colector abierto} (open drain). Es decir, que únicamente podrá bajar la línea a ``0'' conectándola a tierra, enviándose los ``unos'' pasivamente.
-
-        \subsubsection{Funcionamiento del bus I2C - capa física}
-
-            Una vez realizadas las conexiones entre los dispositivos, la siguiente pregunta razonable es cómo opera el bus I2C. Las transferencias de datos siguen, de manera general, los siguientes pasos:
-
-            \begin{enumerate}
-                \item Una transferencia se inicia con una condición de inicio (\textbf{S} (start)), que se señala desde el \emph{Master} bajando \textbf{SDA} a ``0'', mientras \textbf{SCL} se mantiene a ``1''.
-                \item A continuación \textbf{SCL} comienza a oscilar, bajando a ``0'' en primer lugar, mientras se prepara el bit a enviar en \textbf{SDA}.
-                \item Cuando \textbf{SCL} sube a 1, el bit enviado está disponible en \textbf{SDA} y el resto de dispositivos \emph{Slaves} pueden leerlo. 
-                \item Se repiten los pasos 2 y 3 tantas veces sea necesario para enviar todos los bits.
-                \item El último bit es seguido de un pulso de reloj sin dato, en el cual \textbf{SDA} se pone a ``0''.
-                \item Finalmente, se indica la condición de fin (\textbf{P} (stop)), liberando primero \textbf{SCL}, y posteriormente \textbf{SDA}.
-            \end{enumerate}
-
-            Este proceso se puede ver gráficamente en la \Cref{fig:i2c_transfer}.
-            
-            \begin{figure}[h]
-                \centering
-                \includegraphics[width=\textwidth]{res/I2C_data_transfer.png}
-                \caption{Transferencia de datos en I2C. (fuente:wikipedia)}
-                \label{fig:i2c_transfer}
-            \end{figure}
-
-        \subsubsection{Direccionamiento en I2C - capa lógica}\label{subsub:i2clogic}
-            
-            Ahora bien, dentro de estas transferencias, ¿cómo sabemos a qué dispositivo van los bits? para ello, cada \emph{Slave} cuenta con una dirección (de 7 bits, o 10 en versiones más modernas), habitualmente fijada por hardware, y con la que se puede identificar un dispositivo concreto. Así, para escribir, se seguirá el siguiente procedimiento:
-
-            \begin{enumerate}
-                \item Inicio de comunicación con condición inicial \textbf{S} seguida de la dirección (7 bits) + bit ``0'' (write). \emph{Slave} responde \textbf{ACK}.
-                \item Envío del comando (o registro destino) (8 bits). \emph{Slave} responde \textbf{ACK}.
-                \item Envío del dato (8 bits). \emph{Slave} responde \textbf{ACK}.
-                \item Generalmente, y según dispositivo, se pueden enviar datos consecutivos que irán a parar a registros consecutivos si se quiere.
-                \item Fin de comunicación con condición de parada \textbf{P}.
-            \end{enumerate}
-
-            Para leer, el proceso es algo más complejo, ya que primero indicaremos el registro en modo escritura, y posteriormente cederemos el control al \emph{Slave} en modo lectura para que nos pase el dato por el bus.
-
-            \begin{enumerate}
-                \item Inicio de comunicación con condición inicial \textbf{S} seguida de la dirección (7 bits) + bit ``0'' (write). \emph{Slave} responde \textbf{ACK}.
-                \item Envío del comando (o registro destino) (8 bits). \emph{Slave} responde \textbf{ACK}.
-                \item Re-Inicio de comunicación con condición inicial \textbf{S} seguida de la dirección (7 bits) + bit ``1'' (read). \emph{Slave} responde \textbf{ACK}.
-                \item El \emph{Slave} toma el control y envía el dato de vuelta (8 bits). El \emph{Master} puede responder con \textbf{ACK} para pedir más datos consecutivos, o con \textbf{NACK} para terminar la comunicación.
-                \item Fin de comunicación con condición de parada \textbf{P}.
-            \end{enumerate}
-
-            Las condiciones \textbf{ACK} y \textbf{NACK} se indican, respectivamente, con un ``0'' y un ``1'' (sí, están invertidas) por parte del receptor, en la línea \textbf{SDA} tras las transmisión de un byte.
-
-            El proceso para ambas transacciones puede observarse en la \Cref{fig:i2c_read_write}
-
-            \definecolor{masterBG}{HTML}{EBF5FB}
-            \definecolor{masterBORDER}{HTML}{2980B9}
-            \definecolor{slaveBG}{HTML}{FEF9E7}
-            \definecolor{slaveBORDER}{HTML}{D68910}
-            \definecolor{ctrlBG}{HTML}{FDEDEC}
-            \definecolor{ctrlBORDER}{HTML}{CB4335}
-
-            \tikzset{
-                i2cbase/.style={
-                    draw, 
-                    minimum height=0.9cm, 
-                    font=\sffamily\scriptsize, 
-                    align=center, 
-                    outer sep=0pt, 
-                    line width=0.6pt
-                },
-                master/.style={i2cbase, fill=masterBG, draw=masterBORDER, text=masterBORDER!40!black},
-                slave/.style={i2cbase, fill=slaveBG, draw=slaveBORDER, text=slaveBORDER!40!black},
-                ctrl/.style={i2cbase, fill=ctrlBG, draw=ctrlBORDER, text=ctrlBORDER!40!black, font=\sffamily\bfseries\scriptsize},
-                opt/.style={i2cbase, fill=masterBG!30, draw=masterBORDER, dashed, text=masterBORDER!40!black},
-                title/.style={font=\sffamily\bfseries\small, text=gray!90!black},
-                stepnum/.style={font=\sffamily\bfseries\tiny, text=gray!70!black},
-                legendtext/.style={font=\sffamily\tiny, text=gray!80!black}
-            }
-
-            \begin{figure}[h!]
-                \centering
-                \begin{tikzpicture}
-                    \node[ctrl, minimum height=0.4cm, minimum width=0.6cm] (l1) {};
-                    \node[legendtext, right=3pt of l1] {Inicio / Fin (Master)};
-                    
-                    \node[master, minimum height=0.4cm, minimum width=0.6cm, right=100pt of l1] (l2) {};
-                    \node[legendtext, right=3pt of l2] {Generado por \textbf{Master}};
-                    
-                    \node[slave, minimum height=0.4cm, minimum width=0.6cm, right=100pt of l2] (l3) {};
-                    \node[legendtext, right=3pt of l3] {Generado por \textbf{Slave}};
-                \end{tikzpicture}
-                \resizebox{\linewidth}{!}{%
-                \begin{tikzpicture}[node distance=0pt]
-
-                    % Título del diagrama
-                    \node[title, anchor=west] (t1) at (0, 1.3) {1. Escritura en I2C (Write)};
-
-                    % Bloques del protocolo de escritura
-                    \node[ctrl, minimum width=0.6cm] (w_s) at (0,0) {\textbf{S}};
-                    \node[master, right=-0.6pt of w_s, minimum width=1.8cm] (w_addr) {Dirección Slave\\(7 bits)};
-                    \node[master, right=-0.6pt of w_addr, minimum width=0.7cm] (w_bit) {0\\(W)};
-                    \node[slave, right=-0.6pt of w_bit, minimum width=0.9cm] (w_ack1) {\textbf{ACK}\\(0)};
-                    \node[master, right=-0.6pt of w_ack1, minimum width=2.2cm] (w_reg) {Registro / Cmd\\(8 bits)};
-                    \node[slave, right=-0.6pt of w_reg, minimum width=0.9cm] (w_ack2) {\textbf{ACK}\\(0)};
-                    \node[master, right=-0.6pt of w_ack2, minimum width=1.8cm] (w_data) {Dato\\(8 bits)};
-                    \node[slave, right=-0.6pt of w_data, minimum width=0.9cm] (w_ack3) {\textbf{ACK}\\(0)};
-                    \node[opt, right=-0.6pt of w_ack3, minimum width=1.8cm] (w_dataN) {Dato N (opc.)\\(8 bits)};
-                    \node[slave, right=-0.6pt of w_dataN, minimum width=0.9cm] (w_ackN) {\textbf{ACK}\\(0)};
-                    \node[ctrl, right=-0.6pt of w_ackN, minimum width=0.6cm] (w_p) {\textbf{P}};
-
-                    % Indicadores de pasos
-                    \node[stepnum, above=3pt of w_s] {Paso 1};
-                    \node[stepnum, above=3pt of w_addr] {Paso 2};
-                    \node[stepnum, above=3pt of w_reg] {Paso 3};
-                    \node[stepnum, above=3pt of w_data] {Paso 4};
-                    \node[stepnum, above=3pt of w_dataN] {Paso 5};
-                    \node[stepnum, above=3pt of w_p] {Paso 6};
-
-                \end{tikzpicture}%
-                }
-                \vspace{0.8cm}
-                \resizebox{\linewidth}{!}{%
-                \begin{tikzpicture}[node distance=0pt]
-
-                    % Título del diagrama
-                    \node[title, anchor=west] (t2) at (0, 1.3) {2. Lectura en I2C (Read)};
-
-                    % Bloques del protocolo de lectura
-                    \node[ctrl, minimum width=0.6cm] (r_s) at (0,0) {\textbf{S}};
-                    \node[master, right=-0.6pt of r_s, minimum width=1.7cm] (r_addr1) {Dirección Slave\\(7 bits)};
-                    \node[master, right=-0.6pt of r_addr1, minimum width=0.6cm] (r_w) {0\\(W)};
-                    \node[slave, right=-0.6pt of r_w, minimum width=0.8cm] (r_ack1) {\textbf{ACK}\\(0)};
-                    \node[master, right=-0.6pt of r_ack1, minimum width=2.0cm] (r_reg) {Registro / Cmd\\(8 bits)};
-                    \node[slave, right=-0.6pt of r_reg, minimum width=0.8cm] (r_ack2) {\textbf{ACK}\\(0)};
-                    \node[ctrl, right=-0.6pt of r_ack2, minimum width=0.6cm] (r_sr) {\textbf{Sr}};
-                    \node[master, right=-0.6pt of r_sr, minimum width=1.7cm] (r_addr2) {Dirección Slave\\(7 bits)};
-                    \node[master, right=-0.6pt of r_addr2, minimum width=0.6cm] (r_r) {1\\(R)};
-                    \node[slave, right=-0.6pt of r_r, minimum width=0.8cm] (r_ack3) {\textbf{ACK}\\(0)};
-                    \node[slave, right=-0.6pt of r_ack3, minimum width=1.8cm] (r_data) {Dato Slave\\(8 bits)};
-                    \node[master, right=-0.6pt of r_data, minimum width=1.0cm] (r_nack) {\textbf{NACK}\\(1)};
-                    \node[ctrl, right=-0.6pt of r_nack, minimum width=0.6cm] (r_p) {\textbf{P}};
-
-                    % Indicadores de pasos
-                    \node[stepnum, above=3pt of r_s] {Paso 1};
-                    \node[stepnum, above=3pt of r_addr1] {Paso 2};
-                    \node[stepnum, above=3pt of r_reg] {Paso 3};
-                    \node[stepnum, above=3pt of r_sr] {Paso 4};
-                    \node[stepnum, above=3pt of r_addr2] {Paso 5};
-                    \node[stepnum, above=3pt of r_data] {Paso 6};
-                    \node[stepnum, above=3pt of r_p] {Paso 7};
-
-                \end{tikzpicture}%
-                }
-                \caption{Escrituras y lecturas, respectivamente, en I2C}
-                \label{fig:i2c_read_write}
-            \end{figure}
-                    
-        \subsubsection{Líneas auxiliares a I2C}
-
-            En ocasiones, utilizar únicamente las líneas \textbf{SCL} y \textbf{SDA} no es suficiente. Pensemos por ejemplo en el caso de las interrupciones. Con tan sólo las dos líneas de I2C, capturar una interrupción es imposible, tendríamos que hacer una encuesta activa a los periféricos, preguntando periódicamente si tienen algún dato de interés. Esto sería claramente ineficiente.
-
-            Es por ello que las interrupciones de los dispositivos sí van por líneas separadas, para que el procesador sea capaz de capturarlas, identificar directamente el dispositivo causante, y entonces, y sólo entonces, encuestarlo vía I2C para recibir el dato. Es el caso, por ejemplo, con nuestra pantalla táctil y la detección de pulsaciones.
-
-            Adicionalmente, algunos dispositivos disponen de señales extra, para habilitarlos o resetearlos.
+        En nuestro caso, vamos a utilizar el bus \textbf{I2C} para la conexión con el panel táctil. Este bus utiliza dos líneas, \textbf{SCL} para transmitir una señal de reloj, y \textbf{SDA} para transmitir los datos. Permite, a través de identificación mediante direcciones (enviando parejas dirección-dato por la línea \textbf{SDA}), la interconexión de múltiples dispositivos. Su extrema sencillez y flexibilidad han hecho que se haya popularizado ampliamente.
 
         \subsubsection{Conexiones en nuestra placa}
 
             Podemos ver el pinout completo de las conexiones procesador-pantalla táctil en \BRDMAN[6.8]. El conector a la pantalla táctil tiene señales \textbf{SCL}, \textbf{SDA}, \textbf{INT}, \textbf{RESET}, además de varias conexiones para alimentación y tierra. Estas últimas son pasivas y no requieren de control por parte del procesador.
 
-            Las que sí requieren de control, se especifican en \BRDMAN[Appendix A]. Ahí, podemos ver las conexiones que se especifican en la \Cref{tab:ctp_conn}
+            Las que sí requieren de control, se especifican en \BRDMAN[Appendix A]. Ahí, podemos ver las conexiones que se especifican en la \Cref{tab:ctp_conn}, con un esquema ilustrativo en la \Cref{fig:i2c_ctp_architecture}.
 
             \begin{table}[h]
                 \centering
@@ -328,9 +39,76 @@
                 \label{tab:ctp_conn}
             \end{table}
 
+            \begin{figure}[htbp]
+                \centering
+                \begin{tikzpicture}[
+                    font=\sffamily\small,
+                    >=Stealth,
+                    node distance=0.7cm and 2.5cm,
+                    % Box Styles
+                    sw_block/.style={draw=blue!80!black, fill=blue!10, thick, rounded corners=3pt, align=center, minimum width=3.4cm, minimum height=0.9cm},
+                    hw_block/.style={draw=teal!80!black, fill=teal!10, thick, rounded corners=3pt, align=center, minimum width=3.4cm, minimum height=0.9cm},
+                    target_block/.style={draw=orange!80!black, fill=orange!10, thick, rounded corners=3pt, align=center, minimum width=3.4cm, minimum height=0.9cm},
+                    signal/.style={draw, thick, ->},
+                    bisignal/.style={draw, thick, <->},
+                    group/.style={draw=gray!50, dashed, thick, rounded corners=6pt, fill=gray!5, inner sep=12pt}
+                ]
+
+                    % ==================== HOST PROCESSOR ====================
+                    \node[sw_block] (app) {\textbf{Software Layer}\\ \footnotesize App / Driver (\texttt{FT3X67.h})};
+                    \node[hw_block, below left=0.8cm and -0.6cm of app] (i2c_host) {\textbf{I2C3 Peripheral}\\ \footnotesize (Master Controller)};
+                    \node[hw_block, below right=0.8cm and -0.6cm of app] (gpio_host) {\textbf{GPIO / EXTI Logic}\\ \footnotesize (\texttt{EXTI9} / Reset Output)};
+
+                    % ==================== TARGET DEVICE (CTP) ====================
+                    \node[target_block, below=1.5cm of i2c_host] (i2c_target) {\textbf{I2C Slave Controller}\\ \footnotesize (Target Interface)};
+                    \node[target_block, below=1.5cm of gpio_host] (asic) {\textbf{FT3X67 Controller}\\ \footnotesize (ASIC / Microcontroller)};
+                    \node[target_block, fill=orange!25, below=1.2cm of asic, minimum height=2.8cm] (panel) {\textbf{Touch Control Panel}\\ \footnotesize (Glass / Sensor Matrix)};
+
+                    % ==================== CONTAINERS / GROUPS ====================
+                    \begin{scope}[on background layer]
+                    \node[group, fit=(app) (i2c_host) (gpio_host)] (host_group) {};
+                    \node[anchor=north west, font=\sffamily\bfseries\color{blue!80!black}] at (host_group.north west) {Host Processor};
+
+                    \node[group, fit=(i2c_target) (asic) (panel)] (target_group) {};
+                    \node[anchor=south west, font=\sffamily\bfseries\color{orange!90!black}] at (target_group.south west) {Target Device (CTP)};
+                    \end{scope}
+
+                    % ==================== INTERNAL HOST CONNECTIONS ====================
+                    \draw[bisignal] (app) -| node[near end, left, font=\scriptsize] {Reg Access} (i2c_host);
+                    \draw[bisignal] (app) -| node[near end, right, font=\scriptsize] {IRQ / Out} (gpio_host);
+
+                    % ==================== EXTERNAL BUS & CONTROL LINES ====================
+                    % I2C Signals
+                    \draw[bisignal, color=red!70!black] ($(i2c_host.south)+(0.18,0)$) -- node[right, font=\scriptsize\ttfamily] {SCL (PA8)} ($(i2c_target.north)+(0.18,0)$);
+                    \draw[bisignal, color=red!70!black] ($(i2c_host.south)-(0.18,0)$) -- node[left, font=\scriptsize\ttfamily] {SDA (PH8)} ($(i2c_target.north)-(0.18,0)$);
+
+                    % Control Signals
+                    \draw[signal, color=green!50!black] ($(gpio_host.south)+(0.18,0)$) -- node[right, font=\scriptsize\ttfamily] {RESET (PH9)} ($(asic.north)+(0.18,0)$);
+                    \draw[signal, color=purple!80!black] ($(asic.north)-(0.18,0)$) -- node[left, font=\scriptsize\ttfamily] {INT / EXTI9 (PI9)} ($(gpio_host.south)-(0.18,0)$);
+
+                    % ==================== INTERNAL TARGET CONNECTIONS ====================
+                    \draw[bisignal] (i2c_target.east) -- node[above, font=\scriptsize] {Reg R/W} (asic.west);
+                    \draw[bisignal] (asic.south) -- node[left, font=\scriptsize] {Scan / Touch} (panel.north);
+
+                \end{tikzpicture}
+                \caption{Esquema de comunicación entre el procesador principal, el controlador I2C y el ASIC del panel táctil.}
+                \label{fig:i2c_ctp_architecture}
+            \end{figure}
+
+        \subsubsection{Funcionamiento del periférico I2C}
+
+            El periférico que controla el bus \textbf{I2C} se encuentra descrito en \REFMAN[26]. Más allá de la configuración concreta de los registros internos, para controlar los parámetros de \textbf{I2C} como frecuencia, funcionamiento y demás, el periférico ofrece dos funciones principales:
+
+            \begin{enumerate}
+                \item Enviar un dato a un registro concreto de un dispositivo externo concreto.
+                \item Recibir un dato de un registro concreto de un dispositivo externo concreto.
+            \end{enumerate}
+
+            Esto se hará más adelante mediante sendas funciones de escritura y lectura (driver) que utilizará el \PER{I2C} para la comunicación con el dispositivo externo de panel táctil. Estas funciones, interactuando con los registros internos del controlador \PER{I2C}, harán transparente para el usuario los detalles de transacción dentro del bus.
+
     \subsection{Desarrollo de la práctica}
 
-        Llegados a este punto, y con la teoría del bus I2C vista, sólo nos queda comunicarnos con el panel táctil. Haremos una aplicación donde el usuario ``pintará'' con el dedo en la pantalla. Para ello, partiremos de la práctica anterior, donde ya teníamos el controlador de la pantalla funcionando. En lugar de pintarse aleatoriamente, ahora controlaremos nosotros el pintado. Para ello, habrá que hacer lo siguiente:
+        Llegados a este punto, sólo nos queda comunicarnos con el panel táctil. Haremos una aplicación donde el usuario ``pintará'' con el dedo en la pantalla. Para ello, partiremos de la práctica anterior, donde ya teníamos el controlador de la pantalla funcionando. En lugar de pintarse aleatoriamente, ahora controlaremos nosotros el pintado. Para ello, habrá que hacer lo siguiente:
 
         \begin{itemize}
             \item Configurar el bus I2C para poder comunicarnos con el panel táctil (CTP).

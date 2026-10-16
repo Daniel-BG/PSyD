@@ -9,6 +9,7 @@ Bienvenido al sitio web del material de la asignatura de Programación de Sistem
 * 📄 [4 - Interrupciones, barreras y callbacks](teoria/interrupts/interrupts.pdf)
 * 📄 [5 - Periféricos](teoria/peripherals/peripherals.pdf)
 * 📄 [6 - Temporización](teoria/timing/timing.pdf)
+* 📄 [7 - Buses externos](teoria/external_peripherals_buses/external_peripherals_buses.pdf)
 
 ## 🛠️ [Prácticas](practicas/main.pdf)
 * 📁 [Punto de entrada a las prácticas](practicas/practicas.md)
