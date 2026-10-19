@@ -47,21 +47,21 @@
             #define SYSTICK           	((SysTick_TypeDef *) SYSTICK_BASE_ADDR)
         \end{lstlisting}
 
-        A continuación debemos crear dos funciones para desactivar y activar el \PER{SYSTICK}. Para ello da el valor adecuado a cada registro. En \REG{LOAD}, ten en cuenta que tendrás que configurar cada cuánto tiempo quieres que se cuente un \emph{tick}. Lo normal es que los \emph{ticks} sean de 1ms. El reloj base es de 16MHz, así que calcula su valor en base a ello. En \REG{VAL} configurarás el valor inicial de \emph{tick}. Finalmente en \REG{CTRL} deberás activar las interrupciones y el periférico, así como establecer la fuente de reloj al oscilador del procesador.
+        A continuación debemos crear dos funciones para desactivar y activar el \PER{SYSTICK}. Para ello da el valor adecuado a cada registro. En \REG{LOAD}, ten en cuenta que tendrás que configurar cada cuánto tiempo quieres que se cuente un \emph{tick}. Lo normal es que los \emph{ticks} sean de 1ms. El reloj base es de 16MHz, así que calcula su valor en base a ello. En \REG{VAL} configurarás el valor inicial del contador interno del  \emph{ticker}. Finalmente en \REG{CTRL} deberás activar las interrupciones y el periférico, así como establecer la fuente de reloj al oscilador del procesador.
 
         \begin{lstlisting}
             static void inline SysTick_Init(void) {
                 // Default HSI clock is 16MHz on reset. 1ms tick = 16,000 cycles.
                 // ... completar dar los valores adecuados a cada registro.
-                SysTick->LOAD = 
-                SysTick->VAL  = 
-                SysTick->CTRL = 
+                SYSTICK->LOAD = 
+                SYSTICK->VAL  = 
+                SYSTICK->CTRL = 
             }
 
             static void inline SysTick_Disable(void) {
-                SysTick->LOAD = 0U;
-                SysTick->VAL  = 0U;
-                SysTick->CTRL = 0U;
+                SYSTICK->LOAD = 0U;
+                SYSTICK->VAL  = 0U;
+                SYSTICK->CTRL = 0U;
             }
         \end{lstlisting}
 

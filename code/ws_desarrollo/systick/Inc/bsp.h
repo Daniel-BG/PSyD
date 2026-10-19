@@ -633,15 +633,15 @@ void SysTick_Handler(void) {
 static void inline SysTick_Init(void) {
     // Default HSI clock is 16MHz on reset. 1ms tick = 16,000 cycles.
     // ... completar dar los valores adecuados a cada registro.
-    SysTick->LOAD =
-    SysTick->VAL  =
-    SysTick->CTRL =
+    SYSTICK->LOAD =
+    SYSTICK->VAL  =
+    SYSTICK->CTRL =
 }
 
 static void inline SysTick_Disable(void) {
-    SysTick->LOAD = 0U;
-    SysTick->VAL  = 0U;
-    SysTick->CTRL = 0U;
+    SYSTICK->LOAD = 0U;
+    SYSTICK->VAL  = 0U;
+    SYSTICK->CTRL = 0U;
 }
 
 static uint32_t inline GetTick(void) {

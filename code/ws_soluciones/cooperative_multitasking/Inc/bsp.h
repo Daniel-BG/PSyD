@@ -404,7 +404,7 @@ typedef struct {
 #define I2C3_EV_IRQn        72
 #define I2C3_ER_IRQn        73
 
-#define SysTick           	((SysTick_TypeDef *) SYSTICK_BASE_ADDR)
+#define SYSTICK           	((SysTick_TypeDef *) SYSTICK_BASE_ADDR)
 
 
 /*************************************************************
@@ -1103,15 +1103,15 @@ void SysTick_Handler(void);
 
 static void inline SysTick_Init(void) {
     // Default HSI clock is 16MHz on reset. 1ms tick = 16,000 cycles.
-    SysTick->LOAD = (16000U - 1U);
-    SysTick->VAL  = 0U;
-    SysTick->CTRL = (1U << 2) | (1U << 1) | (1U << 0); // Processor Clock, Int Enable, Enable
+    SYSTICK->LOAD = (16000U - 1U);
+    SYSTICK->VAL  = 0U;
+    SYSTICK->CTRL = (1U << 2) | (1U << 1) | (1U << 0); // Processor Clock, Int Enable, Enable
 }
 
 static void inline SysTick_Disable(void) {
-	SysTick->LOAD = 0U;
-	SysTick->VAL  = 0U;
-	SysTick->CTRL = 0U;
+	SYSTICK->LOAD = 0U;
+	SYSTICK->VAL  = 0U;
+	SYSTICK->CTRL = 0U;
 }
 
 static uint32_t inline GetTick(void) {
