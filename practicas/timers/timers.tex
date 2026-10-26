@@ -116,7 +116,7 @@
             //... activa la interrupción UIE en el registro DIER
             static inline void TIM_ENABLE_INT(volatile TIM_TypeDef *TIMx);
             //funciones de uso
-            //... borra el flag pendiente del registro SR (correspondiente a UIE)
+            //... borra el flag pendiente del registro SR (correspondiente a UIF)
             static inline void TIM_CLEAR_FLAG(volatile TIM_TypeDef *TIMx);
             //... comprueba si hay flag pendiente en el registro SR
             static inline uint32_t TIM_CHECK_FLAG(volatile TIM_TypeDef *TIMx);

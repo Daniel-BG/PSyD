@@ -32,3 +32,36 @@ Bienvenido al sitio web del material de la asignatura de Programación de Sistem
 ## 📝 Colección de preguntas de examen
 * ❓ [Sólo enunciados](examenes/main_preguntas.pdf)
 * 💯 [Con soluciones](examenes/main_soluciones.pdf)
+
+## 🔄 Actualizando el repositorio
+
+Es posible que el repositorio cambie con correcciones o adiciones a lo largo del curso. Si ves que ha cambiado (o tu profesor te avisa), ejecuta los siguientes comandos para no perder el trabajo realizado que tú hayas hecho localmente.
+
+```bash
+git add .
+git commit -m "Checkpoint before pull"
+git pull
+```
+
+Con esto crearás un punto de referencia local (commit) al que poder volver si las cosas van mal. Tras ello, con pull, descargarás los nuevos cambios.
+
+---
+
+### ⚠️ ¿Y si hay un conflicto de Merge?
+
+Si has modificado un fichero en la misma línea que se ha modificado en el repositorio, Git te dirá que resuelvas un **conflicto de merge**. 
+
+1. Abre el fichero afectado y busca los marcadores de conflicto:
+   ```c
+   <<<<<<< HEAD (Your Code)
+   //aquí estará tu código
+   =======
+   //aquí estará el código del repositorio que entra en conflicto
+   >>>>>>> [commit-hash]
+   ```
+2. Borra las líneas de conflicto (`<<<<<<<`, `=======`, `>>>>>>>`) y quédate con el código correcto.
+3. Puedes a continuación marcar el conflicto como resuelto en un nuevo commit.
+   ```bash
+   git add .
+   git commit -m "Resolved merge conflict"
+   ```
