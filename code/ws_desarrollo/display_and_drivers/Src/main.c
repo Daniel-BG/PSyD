@@ -121,10 +121,10 @@ uint32_t rand32(void) {
 
 int main(void)
 {
+	SysTick_Init();
 	LCD_Init();
 	FSMC_Init();
 	ST7789H2_INIT();
-	SysTick_Init();
 	
 	/* Clear the LCD */
 	for (int i = 0; i < 240; i++)

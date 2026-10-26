@@ -1,6 +1,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include <bsp.h>
+#include <gfx.h>
 #include <ST7789h2.h>
 
 void LCD_Pins_Init() {
@@ -126,23 +127,28 @@ uint32_t rand32(void) {
     return estado_rng = x;
 }
 
-int main(void)
-{
-	LCD_Init();
-	FSMC_Init();
-	ST7789H2_INIT();
-	SysTick_Init();
 
-	/* Clear the LCD */
-	for (int i = 0; i < 240; i++)
-		for (int j = 0; j < 240; j++)
-			ST7789H2_WritePixel(i, j, LCD_COLOR_WHITE);
+int main(void) {
+    SysTick_Init();
+    LCD_Init();
+    FSMC_Init();
+    ST7789H2_INIT();
 
+    /* Clear screen to white */
+    GFX_FillScreen(LCD_COLOR_WHITE);
 
-	for (int i = 50; i < 60; i++)
-		for (int j = 50; j < 60; j++)
-			ST7789H2_WritePixel(i, j, LCD_COLOR_RED);
+    /* Draw lines */
+    GFX_DrawLine(10, 10, 230, 230, LCD_COLOR_BLACK);
+    GFX_DrawLine(10, 230, 230, 10, LCD_COLOR_BLUE);
 
+    /* Draw squares and rectangles */
+    GFX_DrawSquare(20, 20, 40, LCD_COLOR_RED);
+    GFX_FillSquare(70, 20, 40, LCD_COLOR_GREEN);
+    GFX_DrawRect(130, 20, 80, 40, LCD_COLOR_MAGENTA);
+
+    /* Draw circles */
+    GFX_DrawCircle(60, 180, 30, LCD_COLOR_DARKCYAN);
+    GFX_FillCircle(180, 180, 30, LCD_COLOR_ORANGE);
 
 	while(1)
 	{

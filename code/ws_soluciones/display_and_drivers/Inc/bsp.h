@@ -880,10 +880,11 @@ static void FSMC_NORSRAM_ENABLE(FMC_TypeDef * fsmc, uint32_t bank_number) {
 
 
 /***************************** SysTick FUNCTIONS *********************************/
-volatile uint32_t msTicks;
-void SysTick_Handler(void) {
-    msTicks++;
-}
+
+
+void SysTick_Handler(void);
+uint32_t GetTick(void);
+
 
 static void inline SysTick_Init(void) {
     // Default HSI clock is 16MHz on reset. 1ms tick = 16,000 cycles.
@@ -898,9 +899,6 @@ static void inline SysTick_Disable(void) {
 	SYSTICK->CSR = 0U;
 }
 
-static uint32_t inline GetTick(void) {
-    return msTicks;
-}
 
 static void inline  Delay_ms(uint32_t ms) {
     uint32_t start = GetTick();

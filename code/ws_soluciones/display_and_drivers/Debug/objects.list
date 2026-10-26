@@ -1,3 +1,6 @@
+"./Inc/ST7789h2.o"
+"./Inc/bsp.o"
+"./Inc/gfx.o"
 "./Src/main.o"
 "./Src/syscalls.o"
 "./Src/sysmem.o"
