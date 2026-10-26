@@ -311,7 +311,125 @@
 
         Con esto ya deberíamos tener el display funcionando! El código debería borrar el display a blanco (tardará un poco), pintar un cuadrado rojo, y luego empezar a dibujar cuadrados de colores aleatoriamente.
 
-        Amplía ahora la librería con funciones de dibujado de líneas, rectángulos, círculos... Así podrás tener mucho más control (y hacer de manera más fácil) el dibujado en pantalla. También te puede servir para más tarde desarrollar aplicaciones con interfaces bien chulas.
+        \subsubsection{Creación de la Librería Gráfica (GFX Library)}
+
+            Dibujar gráficos solo con \texttt{ST7789H2\_WritePixel()} resulta tedioso. Para abstraer el dibujado, se diseñan librerías gráficas que faciliten el proceso. 
+
+            Esta librería (implementada por ejemplo en dos archivos llamados \texttt{gfx.h} y \texttt{gfx.c}) debe apoyarse directamente sobre la función de bajo nivel \texttt{ST7789H2\_WritePixel(x, y, color)} proporcionada por el driver del display. A continuación se proporciona un \textbf{ejemplo} de qué funciones podrían implementarse, si bien puedes elegir las que más te convengan.
+
+            \paragraph{Fichero de cabecera (\texttt{gfx.h}):}
+            Crea el fichero \texttt{gfx.h} con las definiciones necesarias y los prototipos de las funciones:
+
+            \begin{lstlisting}
+                #ifndef GFX_H_
+                #define GFX_H_
+
+                #include <stdint.h>
+                #include <stdlib.h>
+                #include "ST7789h2.h"
+
+                #define GFX_WIDTH   240
+                #define GFX_HEIGHT  240
+
+                /* Primitivas basicas con verificacion de limites */
+                void GFX_DrawPixel(int16_t x, int16_t y, uint16_t color);
+                void GFX_DrawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color);
+                void GFX_DrawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color);
+
+                /* Lineas genericas */
+                void GFX_DrawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
+
+                /* Cuadrados y Rectangulos */
+                void GFX_DrawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+                void GFX_FillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+                void GFX_DrawSquare(int16_t x, int16_t y, int16_t size, uint16_t color);
+                void GFX_FillSquare(int16_t x, int16_t y, int16_t size, uint16_t color);
+
+                /* Circulos */
+                void GFX_DrawCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
+                void GFX_FillCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
+
+                /* Control de pantalla */
+                void GFX_FillScreen(uint16_t color);
+
+                #endif /* GFX_H_ */
+            \end{lstlisting}
+
+            \paragraph{Implementación (\texttt{gfx.c}):}
+            A continuación se describen los requisitos algorítmicos que debes codificar dentro de \texttt{gfx.c}:
+
+            \begin{enumerate}
+                \item \textbf{Trazado rápido y comprobación de límites (\texttt{GFX\_DrawPixel}, \texttt{GFX\_DrawFastHLine}, \texttt{GFX\_DrawFastVLine}):}
+                    Implementa \texttt{GFX\_DrawPixel} asegurando que no se dibujen coordenadas fuera del rango de la pantalla. Igualmente implementa funciones rápidas (un solo bucle) para dibujar líneas horizontales y verticales.
+
+                \item \textbf{Algoritmo de Línea de Bresenham (\texttt{GFX\_DrawLine}):}
+                    Para dibujar líneas arbitrarias entre $(x_0, y_0)$ y $(x_1, y_1)$, debes implementar el algoritmo de \emph{Bresenham}. Este algoritmo utiliza únicamente aritmética entera para calcular los píxeles intermedios:
+                    \begin{lstlisting}
+                        void GFX_DrawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color) {
+                            int16_t dx = abs(x1 - x0);
+                            int16_t dy = abs(y1 - y0);
+                            int16_t sx = (x0 < x1) ? 1 : -1;
+                            int16_t sy = (y0 < y1) ? 1 : -1;
+                            int16_t err = dx - dy;
+
+                            while (1) {
+                                GFX_DrawPixel(x0, y0, color);
+                                if (x0 == x1 && y0 == y1) break;
+                                int16_t e2 = 2 * err;
+                                if (e2 > -dy) { err -= dy; x0 += sx; }
+                                if (e2 < dx)  { err += dx; y0 += sy; }
+                            }
+                        }
+                    \end{lstlisting}
+
+                \item \textbf{Dibujado de Rectángulos y Cuadrados:}
+                    \begin{itemize}
+                        \item \texttt{GFX\_DrawRect}: Dibuja solo el borde de un rectángulo mediante líneas horizontales y verticales. Reaprovecha las funciones anteriores.
+                        \item \texttt{GFX\_FillRect}: Rellena el área interna dibujando múltiples líneas horizontales.
+                        \item \texttt{GFX\_DrawSquare} y \texttt{GFX\_FillSquare}: Reutilizan las funciones para un rectángulo con lados iguales.
+                    \end{itemize}
+
+                \item \textbf{Algoritmo del Punto Medio para Círculos (\texttt{GFX\_DrawCircle} y \texttt{GFX\_FillCircle}):}
+                    Para dibujar el contorno de un círculo de radio $r$ centrado en un punto $(x_0, y_0)$, existe el denominado \emph{algoritmo del punto medio de Bresenham} (este tío debió hacer muchas cosas por los gráficos 2D sencillos). La idea detrás del mismo es dibujar solo un arco de 45 grados, y utilizar la simetría en octantes del círculo (básicamente, un círculo se forma de 8 partes iguales, como una pizza). Para la versión rellena (\texttt{GFX\_FillCircle}), sustituye los puntos individuales por líneas verticales que unan los límites simétricos superiores e inferiores:
+                    
+                    \begin{lstlisting}
+                        void GFX_DrawCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color) {
+                            int16_t f = 1 - r;
+                            int16_t ddF_x = 1;
+                            int16_t ddF_y = -2 * r;
+                            int16_t x = 0;
+                            int16_t y = r;
+
+                            GFX_DrawPixel(x0, y0 + r, color);
+                            GFX_DrawPixel(x0, y0 - r, color);
+                            GFX_DrawPixel(x0 + r, y0, color);
+                            GFX_DrawPixel(x0 - r, y0, color);
+
+                            while (x < y) {
+                                if (f >= 0) {
+                                    y--;
+                                    ddF_y += 2;
+                                    f += ddF_y;
+                                }
+                                x++;
+                                ddF_x += 2;
+                                f += ddF_x;
+
+                                GFX_DrawPixel(x0 + x, y0 + y, color);
+                                GFX_DrawPixel(x0 - x, y0 + y, color);
+                                GFX_DrawPixel(x0 + x, y0 - y, color);
+                                GFX_DrawPixel(x0 - x, y0 - y, color);
+                                GFX_DrawPixel(x0 + y, y0 + x, color);
+                                GFX_DrawPixel(x0 - y, y0 + x, color);
+                                GFX_DrawPixel(x0 + y, y0 - x, color);
+                                GFX_DrawPixel(x0 - y, y0 - x, color);
+                            }
+                        }
+                    \end{lstlisting}
+            \end{enumerate}
+
+            \paragraph{Comprobación en \texttt{main.c}:}
+                Añade pruebas en \texttt{main.c}, incluyendo tu librería \texttt{"gfx.h"} y ejecutando un test completo que dibuje líneas diagonales, rectángulos, cuadrados, círculos... de distintos colores.
     
     \subsection{Para hacer más} 
         
