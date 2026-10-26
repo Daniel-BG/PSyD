@@ -153,7 +153,7 @@ void ST7789H2_INIT() {
 	/* Sleep In Command */
 	ST7789H2_WriteReg(ST7789H2_SLEEP_IN, (uint8_t*)NULL, 0);
 	/* Wait for 10ms */
-	DELAY(10);
+	Delay_ms(10);
 
 	//... completar mandar comando de RESET y de SLEEP_OUT con sus correspondientes delays
 

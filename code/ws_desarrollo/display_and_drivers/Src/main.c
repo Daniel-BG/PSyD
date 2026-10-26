@@ -124,7 +124,8 @@ int main(void)
 	LCD_Init();
 	FSMC_Init();
 	ST7789H2_INIT();
-
+	SysTick_Init();
+	
 	/* Clear the LCD */
 	for (int i = 0; i < 240; i++)
 		for (int j = 0; j < 240; j++)

@@ -52,6 +52,9 @@
 //FSMC (Flexible memory controller)
 #define FMC_BASE_ADDR				0xA0000000UL /*!< FMC registers base address                                                */
 
+//Systick
+#define SYSTICK_BASE_ADDR  		(0xE000E010UL)
+
 /*************************************************************
  * REGISTER STRUCTURES
  ************************************************************/
@@ -311,6 +314,13 @@ typedef struct
 	volatile uint32_t SDSR; 	/* 0x158 */
 } FMC_TypeDef;
 
+typedef struct {
+    volatile uint32_t CSR;     // 0x00
+    volatile uint32_t RVR;     // 0x04
+    volatile uint32_t CVR;      // 0x08
+    volatile uint32_t CALIB;    // 0x0C
+} SysTick_TypeDef;
+
 /*************************************************************
  * PERIPHERAL INSTANCES TO BE USED
  ************************************************************/
@@ -349,7 +359,7 @@ typedef struct
 
 #define FMC			        ((FMC_TypeDef *) FMC_BASE_ADDR)
 
-
+#define SYSTICK           	((SysTick_TypeDef *) SYSTICK_BASE_ADDR)
 
 /*************************************************************
  * MACROS
@@ -380,52 +390,6 @@ __attribute__((always_inline)) static inline void __ISB(void)
 {
 	__asm volatile ("isb 0xF":::"memory");
 }
-
-/**
-  * @brief  Main program
-  * @param  None
-  * @retval None
-  */
-#define __NVIC_PRIO_BITS          4U       /*!< CM7 uses 4 Bits for the Priority Levels       */
-
-typedef enum
-{
-  HAL_TICK_FREQ_10HZ         = 100U,
-  HAL_TICK_FREQ_100HZ        = 10U,
-  HAL_TICK_FREQ_1KHZ         = 1U,
-  HAL_TICK_FREQ_DEFAULT      = HAL_TICK_FREQ_1KHZ
-} HAL_TickFreqTypeDef;
-
-
-volatile uint32_t uwTick;
-uint32_t uwTickPrio   = (1UL << __NVIC_PRIO_BITS); /* Invalid PRIO */
-HAL_TickFreqTypeDef uwTickFreq = HAL_TICK_FREQ_DEFAULT;  /* 1KHz */
-uint32_t SystemCoreClock = 16000000;
-#define HAL_MAX_DELAY      0xFFFFFFFFU
-
-void HAL_Delay(uint32_t Delay)
-{
-  uint32_t tickstart = uwTick;
-  uint32_t wait = Delay;
-
-  /* Add a freq to guarantee minimum wait */
-  if (wait < HAL_MAX_DELAY)
-  {
-    wait += (uint32_t)(uwTickFreq);
-  }
-
-  while ((uwTick - tickstart) < wait)
-  {
-  }
-}
-
-void DELAY(uint32_t Delay)
-{
-	//HAL_Delay(Delay);
-	for (uint32_t i = 0; i < 16000*Delay/8; i++);
-}
-
-
 
 
 /*************************************************************
@@ -915,12 +879,34 @@ static void FSMC_NORSRAM_ENABLE(FMC_TypeDef * fsmc, uint32_t bank_number) {
 
 
 
-
-void delay(int loops) {
-	for (int i = 0; i < loops; i++) {
-		__asm("nop");
-	}
+/***************************** SysTick FUNCTIONS *********************************/
+volatile uint32_t msTicks;
+void SysTick_Handler(void) {
+    msTicks++;
 }
+
+static void inline SysTick_Init(void) {
+    // Default HSI clock is 16MHz on reset. 1ms tick = 16,000 cycles.
+    SYSTICK->RVR = (16000U - 1U);
+    SYSTICK->CVR  = 0U;
+    SYSTICK->CSR = (1U << 2) | (1U << 1) | (1U << 0); // Processor Clock, Int Enable, Enable
+}
+
+static void inline SysTick_Disable(void) {
+	SYSTICK->RVR = 0U;
+	SYSTICK->CVR  = 0U;
+	SYSTICK->CSR = 0U;
+}
+
+static uint32_t inline GetTick(void) {
+    return msTicks;
+}
+
+static void inline  Delay_ms(uint32_t ms) {
+    uint32_t start = GetTick();
+    while ((GetTick() - start) < ms);
+}
+
 
 
 #endif /* BSP_H_ */

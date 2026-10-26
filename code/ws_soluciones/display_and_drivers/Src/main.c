@@ -22,13 +22,13 @@ void LCD_Startup_Seq() {
 
 	/* Apply hardware reset according to procedure indicated in FRD154BP2901 documentation */
 	GPIO_PIN_WRITE(GPIOH, 7, GPIO_STATE_ZERO);
-	DELAY(5);   /* Reset signal asserted during 5ms  */
+	Delay_ms(5);   /* Reset signal asserted during 5ms  */
 	GPIO_PIN_WRITE(GPIOH, 7, GPIO_STATE_ONE);
-	DELAY(10);  /* Reset signal released during 10ms */
+	Delay_ms(10);  /* Reset signal released during 10ms */
 	GPIO_PIN_WRITE(GPIOH, 7, GPIO_STATE_ZERO);
-	DELAY(20);  /* Reset signal asserted during 20ms */
+	Delay_ms(20);  /* Reset signal asserted during 20ms */
 	GPIO_PIN_WRITE(GPIOH, 7, GPIO_STATE_ONE);
-	DELAY(10);  /* Reset signal released during 10ms */
+	Delay_ms(10);  /* Reset signal released during 10ms */
 }
 
 void LCD_Init() {
@@ -131,6 +131,7 @@ int main(void)
 	LCD_Init();
 	FSMC_Init();
 	ST7789H2_INIT();
+	SysTick_Init();
 
 	/* Clear the LCD */
 	for (int i = 0; i < 240; i++)

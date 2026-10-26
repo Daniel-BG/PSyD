@@ -99,13 +99,13 @@ void ST7789H2_WriteReg(uint8_t Command, uint8_t *Parameters, uint8_t NbParameter
 void ST7789H2_SetCursor(uint16_t Xpos, uint16_t Ypos)
 {
 	uint8_t   parameter[4];
-	/* CASET: Comumn Addrses Set */
+	/* CASET: Column Address Set */
 	parameter[0] = 0x00;
 	parameter[1] = 0x00 + Xpos;
 	parameter[2] = 0x00;
 	parameter[3] = 0xEF + Xpos;
 	ST7789H2_WriteReg(ST7789H2_CASET, parameter, 4);
-	/* RASET: Row Addrses Set */
+	/* RASET: Row Address Set */
 	parameter[0] = 0x00;
 	parameter[1] = 0x00 + Ypos;
 	parameter[2] = 0x00;
@@ -155,17 +155,17 @@ void ST7789H2_INIT() {
 	/* Sleep In Command */
 	ST7789H2_WriteReg(ST7789H2_SLEEP_IN, (uint8_t*)NULL, 0);
 	/* Wait for 10ms */
-	DELAY(10);
+	Delay_ms(10);
 
 	/* SW Reset Command */
 	ST7789H2_WriteReg(ST7789H2_RESET, (uint8_t*)NULL, 0);
 	/* Wait for 200ms */
-	DELAY(200);
+	Delay_ms(200);
 
 	/* Sleep Out Command */
 	ST7789H2_WriteReg(ST7789H2_SLEEP_OUT, (uint8_t*)NULL, 0);
 	/* Wait for 120ms */
-	DELAY(120);
+	Delay_ms(120);
 
 	/* Normal display for Driver Down side */
 	parameter[0] = 0x00;
