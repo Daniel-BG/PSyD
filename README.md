@@ -24,9 +24,10 @@ Bienvenido al sitio web del material de la asignatura de Programación de Sistem
 * 📁 [Enunciado de la Práctica  8 - I2C y panel táctil](practicas/i2c_and_touch/i2c_and_touch.pdf)
 * 📁 [Enunciado de la Práctica  9 - Persistencia](practicas/persistence/persistence.pdf)
 * 📁 [Enunciado de la Práctica 10 - Multitarea cooperativa](practicas/cooperative_multitasking/cooperative_multitasking.pdf)
-* 📁 [Enunciado de la Práctica 11 - Thingsboard - Control](practicas/thingsboard_data_control/thingsboard_data_control.pdf)
-* 📁 [Enunciado de la Práctica 12 - Thingsboard - OTA](practicas/thingsboard_ota/thingsboard_ota.pdf)
-* 📁 [Enunciado de la Práctica 13 - BSP automatizado con cubeMX](practicas/automated_bsp_cubemx/automated_bsp_cubemx.pdf)
+* 📁 [Enunciado de la Práctica 11 - Integración de RTOS](practicas/rtos_integration/rtos_integration.pdf)
+* 📁 [Enunciado de la Práctica 12 - Thingsboard - Control](practicas/thingsboard_data_control/thingsboard_data_control.pdf)
+* 📁 [Enunciado de la Práctica 13 - Thingsboard - OTA](practicas/thingsboard_ota/thingsboard_ota.pdf)
+* 📁 [Enunciado de la Práctica 14 - BSP automatizado con cubeMX](practicas/automated_bsp_cubemx/automated_bsp_cubemx.pdf)
 * 🏁 [Proyecto final - práctica libre](practicas/final_project/final_project.pdf)
 
 ## 📝 Colección de preguntas de examen
