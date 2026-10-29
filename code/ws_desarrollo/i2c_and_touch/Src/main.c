@@ -122,19 +122,6 @@ void I2C3_Pins_Init () {
 	// ... completar
 }
 
-void I2C3_Pins_Init() {
-	//Touchscreen reset pin
-	RCC_AHB1ENR->bits.GPIOHEN = 1;
-	GPIO_CONFIG(GPIOH, 9, GPIO_MODE_OUTPUT, GPIO_OTYPE_PP, GPIO_OSPEED_LOW, GPIO_PUPD_NONE, 0);
-	GPIO_PIN_WRITE(GPIOH, 9, 1);
-	//Pin A8 has I2C_SCL
-	RCC_AHB1ENR->bits.GPIOAEN = 1;
-	GPIO_CONFIG(GPIOA, 8, GPIO_MODE_ALT, GPIO_OTYPE_OD, GPIO_OSPEED_HIGH, GPIO_PUPD_NONE, GPIO_AF4_I2C);
-	//Pin H8 has I2C_SDA
-	RCC_AHB1ENR->bits.GPIOHEN = 1;
-	GPIO_CONFIG(GPIOH, 8, GPIO_MODE_ALT, GPIO_OTYPE_OD, GPIO_OSPEED_HIGH, GPIO_PUPD_NONE, GPIO_AF4_I2C);
-}
-
 void I2C3_Reg_Config() {
     //Enable I2C3 and reset cycle
     // ... completar

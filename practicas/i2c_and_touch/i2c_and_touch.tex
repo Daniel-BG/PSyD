@@ -120,7 +120,7 @@
 
         \subsubsection{Configuración del bus I2C}
             
-            Lo primero que debemos hacer es activar los pines adecuados para la comunicación. En primer lugar, los pines \textbf{SCL} y \textbf{SDA} (PA8 y PH8) deben configurarse en modo alternativo con función 4 (esto los conecta al I2C3, ver \DSMAN[Table 12]), modo open drain, sin pull up y velocidad alta. Además, hay que asegurarse de activar \REG{GPIOAEN} y \REG{GPIOBEN} en \REG{AHB1ENR} (\REFMAN[5.3.10]).
+            Lo primero que debemos hacer es activar los pines adecuados para la comunicación. En primer lugar, los pines \textbf{SCL} y \textbf{SDA} (PA8 y PH8) deben configurarse en modo alternativo con función 4 (esto los conecta al I2C3, ver \DSMAN[Table 12]), modo open drain, sin pull up y velocidad alta. Además, hay que asegurarse de activar \REG{GPIOAEN} y \REG{GPIOHEN} en \REG{AHB1ENR} (\REFMAN[5.3.10]).
 
             Por otro lado, debemos asegurarnos que el CTP no está en modo RESET, para ello, debemos activar el GPIO para el pin PH9 (Correspondiente a CTP RESET (\Cref{tab:ctp_conn})). Este pin debe configurarse en modo salida, push-pull sin pullup, y velocidad baja. A continuación debemos escribir un ``1'' en él para desactivar el RESET (que es en lógica inversa).
 

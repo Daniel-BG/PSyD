@@ -53,6 +53,67 @@
 
 
     \begin{enumerate}
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % Cuestiones básicas sobre código%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+        \item Complete la siguiente función:
+            \begin{lstlisting}
+                /**
+                 * @param value es un puntero al dato que se cambia
+                 * @param byte_index es un índice (0-3) que indica el byte a cambiar
+                 * @param byte_value es el valor que hay que cambiar
+                 * @example Por ejemplo, si *value=0xabababab, byte_index=2, 
+                 *          y byte_value=0xcd, el resultado será, que tras la llamada,
+                 *          *value=0xabcdabab
+                 */
+                static inline void set_byte(uint32_t * value, uint32_t byte_index, uint8_t byte_value) {
+
+                }
+            \end{lstlisting}
+
+            \begin{solution}
+                \begin{lstlisting}
+                    static inline void set_byte(uint32_t * value, uint32_t byte_index, uint8_t byte_value) {
+                        *value &= ~(0xff << (byte_index * 8));
+                        *value &= (((uint32_t) byte_value & 0xff) << (byte_index * 8));
+                    }
+                \end{lstlisting}               
+            \end{solution}
+
+        \item El periférico \PER{CRC} (ver \Cref{fig:crcregmap}) sirve para generar códigos de comprobación que verifican la integridad de los datos. Su acceso se realiza a partir de la dirección \MEMORY{0x40023000}. Escriba el código C necesario como para inicializar el registro \REG{CR} sin cambio de orden de datos (bits  \REG{REVx} a cero), ancho de 8 bits (\texttt{10b} en \REG{POLYSIZE}) y forzando un reseteo (\REG{RESET} a 1, este bit se limpia solo tras activarlo). Tenga en cuenta que no se permite un acceso directo a la dirección de memoria, sino que hay que crear una estructura de datos para el periférico.
+        
+            \begin{figure}
+                \centering
+                \includegraphics[width=0.9\linewidth]{res/crc_regmap.png}
+                \caption{Tabla de registros del periférico CRC}
+                \label{fig:crcregmap}
+            \end{figure}
+
+            \begin{solution}
+                \begin{lstlisting}
+                    #define CRC_BASE_ADDR 0x40023000
+
+                    typedef struct
+                    {
+                        volatile uint32_t DR;
+                        volatile uint32_t IDR;
+                        volatile uint32_t CR;
+                        volatile uint32_t INIT;
+                        volatile uint32_t POL;
+                    } CRC_TypeDef;
+
+                    #define CRC ((CRC_TypeDef *) CRC_BASE_ADDR)
+
+                    static inline void CRC_SET() {
+                        //        REV_OUT    REV_IN     POLYSIZE      RESET
+                        CRC->CR = (0 << 7) | (0 << 5) | (0b10 << 3) | (1);
+                    }   
+                \end{lstlisting}
+            \end{solution}
+                
+
         \item ¿Qué efecto produce en la compilación calificar un puntero a un registro con la palabra clave \lstinline|volatile| en lenguaje C?
 
             \begin{solution}
@@ -82,6 +143,132 @@
                 La posición del bit dentro del registro de 32 bits es el resto de la división: $N \pmod{32}$. En operaciones bit a bit equivale a $N \ \& \ 0\text{x1F}$ ($N \ \& \ 31$).
             \end{solution}
 
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% Cuestiones de ISRs       %%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+        \item Compare el funcionamiento del modelo de E/S por encuesta (\emph{polling}) frente al modelo guiado por interrupciones. Analiza las ventajas y desventajas de cada uno en relación con la eficiencia de la CPU, latencia de respuesta y complejidad del código.
+                
+            \begin{solution}
+                La E/S por polling implica estar continuamente, en un bucle, revisando los registros y periféricos para observar si se han producido interrupciones. La ventaja es que se puede mirar en momentos concretos, la desventaja es que es ineficiente, pues se pierde tiempo consultando en numerosas ocasiones donde no hay nada preparado. La latencia de respuesta, además, depende de la frecuencia de consulta. El código es muy sencillo si sólo se consulta en una ubicación, pero muy complejo si se necesita consultar en diferentes ubicaciones.
+
+                Por contra, la E/S basada en interrupciones nos permite desacoplar esta gestión, haciendo que el hilo principal se dedique a otras tareas, y únicamente se atiendan las interrupciones, de manera inmediata, cuando son avisadas. Esto aligera la carga computacional en la CPU y permite un código modular, con el sobrecoste de una función extra por cada interrupción.
+            \end{solution}
+        
+
+        \item ¿Qué datos contiene la tabla de vectores de un procesador? ¿En qué contexto y cómo se utilizan?
+        
+            \begin{solution}
+                Contiene punteros a todas las ISRs que tratan las diversas interrupciones del procesador. Al dispararse una interrupción en una línea concreta, el puntero correspondiente se extrae, obteniéndose la dirección de comienzo de la ISR. El procesador guarda el estado del procesador, y salta a esa parte del código para atender la interrupción. Tras terminar, vuelve al punto desde donde se interrumpió recuperando el estado guardado.
+            \end{solution}
+
+        \item ¿Qué tareas básicas ha de realizar la rutina de inicialización \texttt{Reset\_Handler} antes de saltar a \texttt{main}?
+        
+            \begin{solution}
+                Inicializar el stack pointer, configurar algunos elementos básicos del sistema (reloj/memoria), y finalmente inicializar los datos de memoria (secciones \texttt{.data} y \texttt{.bss}) antes de saltar.
+            \end{solution}
+
+        \item A la hora de configurar las rutinas de tratamiento de interrupción (ISRs), se utilizan los siguientes fragmentos de código:
+        
+            \begin{lstlisting}
+                //1)
+                    . section . isr_vector , " a ", % progbits
+                    . type g_pfnVectors , %object
+                
+                    g_pfnVectors :
+                        . word _estack /* 0 x00 : Pila inicial */
+                        //...
+                        . word USART1_IRQHandler
+                        //...
+
+                //2)
+                    . weak USART1_IRQHandler
+                    . thumb_set USART1_IRQHandler , Default_Handler
+
+                //3)
+                    void USART1_IRQHandler ( void ) {
+                        //...
+                    }             
+            \end{lstlisting}
+
+            Indica qué función cumple cada uno de ellos.
+
+            \begin{solution}
+                \begin{enumerate}
+                    \item Inicializa la tabla de vectores, colocando cada puntero a ISR en las posiciones indicadas por sus líneas de interrupción correspondientes.
+                    \item Asigna, por defecto, la rutina \texttt{Default\_Handler} para hacerse cargo de la interrupción en cuestión.
+                    \item Reescribe la ISR para que, al estar definida, sustituya el enlazado débil (\texttt{.weak}) anterior y se utilice automáticamente, en lugar del \texttt{Default\_Handler}.
+                \end{enumerate}
+            \end{solution}
+
+        \item Indica, preferiblemente con un diagrama, el flujo de ejecución cuando una ISR interrumpe el hilo principal de ejecución. En particular, señala qué ocurre con los registros y la tabla de vectores del procesador.
+        
+            \begin{solution}
+                La siguiente figura muestra el diagrama correspondiente:
+
+            {
+                \centering
+                \begin{tikzpicture}[
+                    node distance=0.8cm and 1.2cm,
+                    font=\small,
+                    box/.style={draw, rectangle, rounded corners=3pt, fill=blue!10, draw=blue!60, align=center, minimum width=3.2cm, minimum height=0.8cm},
+                    hwbox/.style={draw, rectangle, rounded corners=3pt, fill=orange!15, draw=orange!70, align=center, minimum width=3.2cm, minimum height=0.8cm},
+                    isrbox/.style={draw, rectangle, rounded corners=3pt, fill=green!15, draw=green!60, align=center, minimum width=3.2cm, minimum height=0.8cm},
+                    vtcell/.style={draw, rectangle, align=center, minimum width=6cm, minimum height=0.6cm, font=\scriptsize, fill=yellow!10, draw=yellow!60!black},
+                    vtheader/.style={draw, rectangle, align=center, minimum width=6cm, minimum height=0.6cm, font=\scriptsize\bfseries, fill=yellow!30, draw=yellow!60!black},
+                    arrow/.style={-{Stealth[length=2.5mm]}, thick, draw=gray!80},
+                    lookup/.style={-{Stealth[length=2.5mm]}, thick, draw=red!70, dashed},
+                    jump/.style={-{Stealth[length=2.5mm]}, thick, draw=green!60!black}
+                ]
+
+                    % Main Thread Box
+                    \node (main) [box] {Hilo Principal (\texttt{main})};
+                    
+                    % Hardware event
+                    \node (irq) [hwbox, right=3.9cm of main] {1. Evento de Hardware\\(Disparo de EXTI0 IRQ)};
+                    
+                    % Context save
+                    \node (stack) [hwbox, below=0.8cm of irq] {2. Guardar contexto\\(Hardware apila R0-R3,\\R12, LR, PC, xPSR)};
+
+                    % Vector Table representation
+                    \node (vt_head) [vtheader, below=1.0cm of stack] {Tabla de Vectores (Memoria Flash)};
+                    \node (vt_sp)   [vtcell, below=0cm of vt_head] {\texttt{0x0000\_0000}: Initial Stack Pointer};
+                    \node (vt_rst)  [vtcell, below=0cm of vt_sp]   {\texttt{0x0000\_0004}: Reset\_Handler};
+                    \node (vt_dots) [vtcell, below=0cm of vt_rst]  {\dots};
+                    \node (vt_exti) [vtcell, fill=orange!35, draw=orange!90, below=0cm of vt_dots] {\textbf{\texttt{0x0000\_0058}: \&EXTI0\_IRQHandler}};
+                    \node (vt_dots2)[vtcell, below=0cm of vt_exti] {\dots};
+
+                    % ISR execution
+                    \node (isr) [isrbox, left=3cm of vt_exti] {Ejecución de la ISR\\(\texttt{EXTI0\_IRQHandler})};
+                    
+                    % Context restore
+                    \node (unstack) [hwbox, above=3.5cm of isr] {5. Restaurar Contexto\\(Desapilar registros)};
+
+                    % Flow arrows
+                    \draw [lookup] (main) -- (irq) node[midway, above, font=\tiny, text=red!80!black] {Interrupción};
+                    \draw [arrow] (irq) -- (stack);
+                    \draw [arrow] (stack) -- (vt_head) node[midway, right, font=\tiny] {3. Vector determinado por línea};
+                    \draw [jump] (vt_exti) -- (isr) node[midway, above, font=\tiny, text=green!50!black] {4. Salto a dirección ISR};
+                    \draw [arrow] (isr) -- (unstack);
+                    \draw [arrow] (unstack) -- (main) node[midway, right, font=\tiny] {6. Retorno (\texttt{BX LR})};
+
+                \end{tikzpicture}
+            }
+            \end{solution}
+
+        \item Explica las diferencias entre los \texttt{Callbacks} frente a gestionar ISRs directamente.
+        
+            \begin{solution}
+                Utilizando directamente ISRs, tenemos entremezclado el código de gestión con la lógica de nuestro programa. Esto hace que sea menos portable (por ejemplo, al cambiar de arquitectura con diferentes ISRs) y menos flexible (sólo podemos atender las ISR desde un único lugar).
+
+                Los callbacks ofrecen la posibilidad de registrar múltiples funciones que serán llamadas tras una ISR para informar de la actualización del periférico o evento correspondiente, desacoplando la capa de gestión hardware de la capa software, y permitiendo mayor protabilidad.
+            \end{solution}
+
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% Cuestiones de periféricos%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
         \item ¿Qué sucede al intentar modificar los registros de control de un periférico (por ejemplo \PER{GPIOA}) si no se ha activado previamente su reloj en el registro \PER{RCC} correspondiente? (En este caso, \REG{RCC\_AHB1ENR})
 
             \begin{solution}
@@ -98,24 +285,96 @@
                 \]
             \end{solution}
 
+        \item Explica cómo se consiguen transmitir datos por una \PER{UART}. ¿Cómo se sincronizan emisor y receptor?
+            
+            \begin{solution}
+                La \PER{UART} tiene, entre otras configuraciones, la velocidad a la que trabaja. Es imprescindible que emisor y receptor tengan la misma velocidad de operación para sincronizarse. En cuanto a los datos, se transmiten paquetes de 7 u 8 bits (más paridad si es requerido), delimitados con marcadores de start y stop para identificarlos.
+            \end{solution}
+
+        \item En un \PER{GPIO}, los pines se pueden configurar en varios modos: entrada, salida, modo alternativo y modo analógico. ¿Qué funcionalidad nos ofrece el modo alternativo, y cómo se utiliza?
+        
+                
+            \begin{solution}
+                El modo alternativo permite conectar el \PER{GPIO} con uno de múltiples periféricos que lo comparten. Utilizando este modo les podemos dar salida al exterior y conectarlos con otros elementos externos al procesador, como por ejemplo conectar la \PER{UART} con el ordenador. 
+                .
+            \end{solution}
+
         \item El gestor de interrupciones externas \PER{EXTI} tiene sólo unas pocas líneas (en concreto 16), muchas menos que la totalidad de pines de los que dispone el procesador (16 pines por puerto, en 10 puertos diferentes). ¿Cuántos pines puedo utilizar simultáneamente para interrumpir al procesador? ¿Qué restricciones existen?
         
             \begin{solution}
                 \PER{EXTI} multiplexa los pines de entrada, colocando todos los pines "0" (PA0, PB0, PC0,...) en la línea \texttt{EXTI0}, y así sucesivamente. Por tanto, el máximo de pines utilizables para interrumpir es de 16. La restricción existente es que nunca podremos utilizar dos pines con el mismo número (por ejemplo PA0 y PB0) a la vez, ya que comparten línea. Sí es posible sin embargo utilizar todos los pines de un puerto a la vez (PA0, PA1, PA2...) ya que cada uno va a una línea diferente.
             \end{solution}
 
-        \item En el código de inicialización del procesador, se definen todas las rutinas de tratamiento de interrupción. Por defecto, todas ellas apuntan a la misma función llamada \texttt{Default\_Handler}. ¿Cómo se consigue cambiar esto al redefinir una ISR manualmente? ¿Por qué no se sigue apuntando a \texttt{Default\_Handler}?
+        \item Asumiendo una frecuencia de entrada de 16MHz, calcule los valores de los registros de \emph{preescalado} y \emph{auto-reload} para conseguir un timer que se dispare cada 10 milisegundos.
         
             \begin{solution}
-                Aunque por defecto se apunte a \texttt{Default\_Handler}, su puntero está definido como \texttt{.weak}. Esto quiere decir que cualquier redefinición del mismo ganará prioridad sobre la original. Por tanto, al redefinirlo, conseguimos que el enlazador apunte a la nueva función en lugar de la antigua.
+                Tenemos que conseguir una división de 160000 sobre la frecuencia original. El preescalado reduce la frecuencia de entrada, y el auto-reload es quien controla cada cuántos ciclos se dispara la interrupción. Por ejemplo, podemos configurar el preescalado a 16, y el auto-reload a 10000. Los valores exactos para lograr esta división serían de 15 y 9999, ya que el '0' cuenta como un ciclo aparte.
+            \end{solution}
+
+        \item Defina las variables y funciones necesarias para implementar un \emph{ticker} de sistema que mida el tiempo en milisegundos mediante llamadas a una función \texttt{GetTick}. Asuma que el periférico ya está configurado para generar las interrupciones, y que la ISR que lo gestiona se llama \texttt{Systick\_Handler}.
+        
+            \begin{lstlisting}
+                volatile uint32_t msTicks;
+                
+                static uint32_t inline GetTick (void) {
+                    return msTicks;
+                }
+
+                void SysTick_Handler (void) {
+                    msTicks++;
+                }
+            \end{lstlisting}
+            
+        \item Describe la arquitectura física del bus I2C (líneas y funcionamiento). Explica la secuencia de pasos (a nivel lógico) que debe seguir un maestro para realizar una operación de lectura de un registro en un dispositivo esclavo.
+        
+            \begin{solution}
+                Un bus I2C tiene dos líneas: reloj y datos. El maestro controla la señal de reloj y, dependiendo de la fase de la comunicación, los datos serán controlados también por maestro o esclavo. A nivel lógico, para leer un registro se manda primero la dirección del esclavo (en modo escritura), seguido del registro a leer. A continuación, se manda de nuevo la dirección del esclavo (en modo lectura), el cual responderá con el dato.
+            \end{solution}
+
+
+        \item Explica por qué es obligatorio borrar antes de escribir un dato en memoria \PER{FLASH}.
+                    
+            \begin{solution}
+                La memoria Flash solo permite pasar de un estado a otro (de 1 a 0). El borrado configura todo a 1, y al escribir se van poniendo ceros en las posiciones indicadas. Por construcción y debido a limitaciones tecnológicas, no se pueden escribir unos, así que la única opción es borrarla antes.
+            \end{solution}
+        
+        \item Al almacenar datos de configuración en memoria no volátil, ¿cuál es el propósito de incluir un patrón o \emph{magic number}? Describe el flujo lógico durante el arranque para decidir si los datos leídos son válidos o deben cargarse los valores por defecto.
+        
+            \begin{solution}
+                El patrón se incluye para poder saber si los datos que se leen han sido configurados a propósito, o son residuales de algún otro programa, o incluso datos vacíos por ser la primera vez que se inicia el dispositivo. Al arrancar, se comprueban unas posiciones de memoria predefinidas donde, si se encuentra el patrón, se entenderá que los datos que vienen a continuación son válidos. De lo contrario se cargan los valores por defecto.
+            \end{solution}
+        
+        \item Explica la diferencia entre un planificador multitarea cooperativo y uno expropiativo. Analiza qué ocurre en un sistema cooperativo si una de las tareas entra en un bucle prolongado o bloqueante.  
+        
+            \begin{solution}
+                En un planificador cooperativo, cada tarea debe, manualmente, ceder el control (terminar). En uno expropiativo, un gestor (o kernel en un RTOS) se encarga de cambiar las tareas en ejecución incluso si éstas no han terminado voluntariamente. Esto permite que, si una se queda "colgada", el sistema la pueda sustituir por otra y no se pare la ejecución del resto. Esto no ocurre en multitarea cooperativa, donde si una tarea se bloquea, bloqueará también al resto hasta que se desbloquee, o indefinidamente si no lo hace,
+            \end{solution}
+        
+        \item En un RTOS, explica la relación de las interrupciones \texttt{PENDSV} y \texttt{SysTick} con el cambio de tarea.
+        
+            \begin{solution}
+                Cada cierto tiempo, la interrupción de \texttt{Systick} se dispara. En ese momento, se analizan las tareas pendientes de ejecutar y se determina cuál será la siguiente en ejecutar. En caso de existir (si ninguna tarea tiene que ejecutarse, el sistema seguiría a la espera), se activa la interrupción \texttt{PENDSV} de cara a que lance la tarea correspondiente al activarse. Esta interrupción tiene la prioridad mínima, por lo que se atenderán primero todas las demás ISR pendientes (para no quedarse a la espera) y finalmente la tarea correspondiente entrará en ejecución.
+            \end{solution}
+        
+        \item Explique, en el contexto de un RTOS, las diferentes pilas o \emph{Stacks} que existen, así como sus funciones y contenidos.
+        
+            \begin{solution}
+                Por un lado tenemos el \emph{main stack}, donde se almacena la pila del hilo principal, así como las interrupciones cuando son disparadas. Por otro lado están los stacks de tarea, donde cada tarea almacena su pila. Así, se puede dimensionar la pila principal para el peor caso donde se anidasen todas las interrupciones a la vez, y las pilas de los hilos hacerse mucho más pequeñas para almacenar solo el stack de funciones correspondiente, sin preocuparse de memoria extra para interrupciones.
+            \end{solution}
+        
+        \item Explique por qué en microcontroladores modernos la señal de reloj de cada periférico se encuentra desactivada por defecto tras un reinicio. ¿Cómo se gestiona su activación, y qué ocurre si se intenta acceder a los registros de un periférico cuyo reloj no ha sido habilitado previamente?   
+        
+            \begin{solution}
+                Al tener tantos periféricos en un microcontrolador moderno, mantener todos activos todo el tiempo sería ineficiente desde el punto de vista energético. Se aplican técnicas que aíslan los relojes de cada periférico, haciendo que su consumo sea cero en caso de no estar activos. Por tanto, en el caso de intentar acceder a un registro (especialmente en escritura), estos accesos no tendrán efecto, o devolverán datos basura.
+            \end{solution}
+        
+        \item Compara las fuentes de reloj internas (HSI, LSI) con las externas por cristal de cuarzo (HSE, LSE) en términos de precisión, y consumo energético. ¿Por qué utilizaríamos un oscilador de cuarzo de 32,768 kHz para el reloj en tiempo real (RTC)?
+        
+            \begin{solution}
+                Las fuentes internas son poco precisas, y se generan mediante osciladores basados en inversores o condensadores. Lo bueno es que están integradas y no hace falta hardware externo. Las fuentes externas basadas en cristal de cuarzo son mucho más precisas, pero ocupan espacio en la PCB. En cuanto al consumo, la principal diferencia radica en la frecuencia, a más frecuencia consumirá más, independientemente de si es externa o interna. El oscilador del RTC sería de 32KHz para ser de baja frecuencia y consumir menos, y de cuarzo para ser preciso y mantener correctamente la cuenta del tiempo.
             \end{solution}
 
     \end{enumerate}
-
-
-    %UART
-    %I2C
-    %linker script
 
 
     \Closesolutionfile{solutions}
