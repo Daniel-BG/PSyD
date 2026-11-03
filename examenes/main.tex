@@ -49,9 +49,6 @@
 
 \section{Preguntas}
 
-    En construcción...
-
-
     \begin{enumerate}
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,7 +114,7 @@
         \item ¿Qué efecto produce en la compilación calificar un puntero a un registro con la palabra clave \lstinline|volatile| en lenguaje C?
 
             \begin{solution}
-                Al nombrarlo como \lstinline|volatile|, le decimos al compilador que su valor podría cambiar por fuentes ajenas al programa (por ejemplo el propio periférico). Por tanto, no debería realizar optimizaciones basadas en suposiciones sobre su valor, leyéndolo siempre que lo necesite directamente desde memoria.
+                Al nombrarlo como \lstinline|volatile|, le decimos al compilador que su valor podría cambiar por fuentes ajenas al programa (por ejemplo el propio periférico). Por tanto, no debería realizar optimizaciones basadas en suposiciones sobre su valor, como eliminar bucles o reutilizarlo desde registros, leyéndolo/escribiéndolo siempre que lo necesite directamente en memoria.
             \end{solution}
 
         \item Escriba una función en C \lstinline|void gpio_set_mode(GPIO_TypeDef *GPIOx, uint32_t pin, uint32_t mode)| que configure de forma atómica a nivel de software el modo de un pin en el registro \REG{MODER} (donde cada pin ocupa 2 bits). Asegúrese de limpiar primero la configuración previa mediante máscaras binarias antes de aplicar el nuevo modo
@@ -143,11 +140,165 @@
                 La posición del bit dentro del registro de 32 bits es el resto de la división: $N \pmod{32}$. En operaciones bit a bit equivale a $N \ \& \ 0\text{x1F}$ ($N \ \& \ 31$).
             \end{solution}
 
+
+        \item Dado el siguiente \emph{linker script}:
+    
+            \begin{lstlisting}
+                MEMORY
+                {
+                    RAM (xrw)   : ORIGIN = 0x20000000, LENGTH = 256K
+                    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 512K
+                }
+
+                SECTIONS
+                {
+                    .isr_vector : {
+                        KEEP(*(.isr_vector))
+                    } >FLASH
+
+                    .text : {
+                        *(.text*)
+                        *(.rodata*)
+                    } >FLASH
+
+                    .rodata :
+                    {
+                        *(.rodata)   
+                        *(.rodata*)       
+                    } >FLASH
+
+                    _sidata = LOADADDR(.data); 
+
+                    .data :
+                    {
+                        _sdata = .;        /* Inicio de datos en RAM */
+                        *(.data)           /* .data sections */
+                        *(.data*)          /* .data* sections */
+                        _edata = .;        /* Fin de datos en RAM*/
+
+                    } >RAM AT> FLASH 
+
+                    .bss : {
+                        _sbss = .;
+                        *(.bss*)
+                        _ebss = .;
+                    } > RAM
+
+                    _estack = ORIGIN(RAM) + LENGTH(RAM);
+                }
+            \end{lstlisting}
+
+            \begin{itemize}
+                \item Realice un esquema del mapa de memoria de las diferentes secciones.
+                \item Indique quién es el responsable de inicializar la memoria RAM, dónde reside su código, y cómo se llega a ejecutar.
+            \end{itemize}
+
+            \begin{solution}
+                \begin{tikzpicture}[
+                    memblock/.style={rectangle, draw, minimum height=1.0cm, minimum width=3.5cm, align=center, fill=white},
+                    label/.style={font=\bfseries\small},
+                    addr/.style={font=\ttfamily\scriptsize, align=right, xshift=-0.1cm},
+                    symbol/.style={font=\ttfamily\scriptsize, align=left, xshift=0.1cm},
+                    copy_arrow/.style={-{Stealth[]}, thick, shorten >=2pt, shorten <=2pt, densely dashed, blue!70!black}
+                    ]
+
+                    % Constants for layout
+                    \def\memwidth{3.8}
+                    \def\regionheight{8.5}
+                    \def\memh{0.9}
+
+                    % Pre-calculated FLASH coordinates
+                    \pgfmathsetmacro{\yzero}{0}
+                    \pgfmathsetmacro{\yone}{\yzero + \memh*0.7}
+                    \pgfmathsetmacro{\ytwo}{\yone + \memh*3.2}
+                    \pgfmathsetmacro{\ythree}{\ytwo + \memh*1.2}
+                    \pgfmathsetmacro{\yfour}{\ythree + \memh*1.5}
+                    \pgfmathsetmacro{\yflashmid}{\yfour + (\regionheight - \yfour)/2}
+
+                    % Pre-calculated RAM coordinates
+                    \pgfmathsetmacro{\ramx}{8}
+                    \pgfmathsetmacro{\ryzero}{0}
+                    \pgfmathsetmacro{\ryone}{\ryzero + \memh*1.5}
+                    \pgfmathsetmacro{\rytwo}{\ryone + \memh*2.2}
+                    \pgfmathsetmacro{\ryfreemid}{\rytwo + (\regionheight - \rytwo - \memh)/2}
+
+                    % Arrow midpoints
+                    \pgfmathsetmacro{\flashmid}{\ythree + (\memh*1.5)/2}
+                    \pgfmathsetmacro{\rammid}{\ryone/2}
+
+                    % =========================================================================
+                    % --- FLASH (Left Column) ---
+                    % =========================================================================
+                    \node[label] at (0, 0.5) {FLASH (512K)};
+
+                    % FLASH Range and Labels
+                    \node[addr, anchor=south east] at (-\memwidth/2, 0) {0x08000000};
+                    \node[addr, anchor=north east] at (-\memwidth/2, \regionheight) {0x08080000};
+
+                    % FLASH container box
+                    \draw[thick] (-\memwidth/2, 0) rectangle (\memwidth/2, \regionheight);
+
+                    % .isr_vector
+                    \draw[fill=lightgray!30] (-\memwidth/2, \yzero) rectangle (\memwidth/2, \yone) node[midway] {.isr\_vector};
+
+                    % .text
+                    \draw[fill=white] (-\memwidth/2, \yone) rectangle (\memwidth/2, \ytwo) node[midway, align=center] {\texttt{.text}};
+
+                    % .rodata
+                    \draw[fill=white] (-\memwidth/2, \ytwo) rectangle (\memwidth/2, \ythree) node[midway] {\texttt{.rodata}};
+
+                    % Marker for _sidata
+                    \node[symbol, anchor=south west] at (\memwidth/2, \ythree) {\_sidata};
+
+                    % .data (Initialization image in FLASH)
+                    \draw[fill=blue!5!white, dashed] (-\memwidth/2, \ythree) rectangle (\memwidth/2, \yfour) node[midway, align=center] {\texttt{.data}\\ (Init Image)};
+
+                    % Unused FLASH
+                    \node[fill=white, inner sep=1pt] at (0, \yflashmid) {Unused FLASH};
+
+                    % =========================================================================
+                    % --- RAM (Right Column) ---
+                    % =========================================================================
+                    \node[label] at (\ramx, 0.5) {RAM (256K)};
+
+                    % RAM Range and Labels
+                    \node[addr, anchor=south east] at (\ramx - \memwidth/2, 0) {0x20000000};
+                    \node[addr, anchor=north east] at (\ramx - \memwidth/2, \regionheight) {0x20040000};
+
+                    % RAM container box
+                    \draw[thick] (\ramx - \memwidth/2, 0) rectangle (\ramx + \memwidth/2, \regionheight);
+
+                    % .data (in RAM)
+                    \node[symbol, anchor=south west] at (\ramx + \memwidth/2, \ryzero) {\_sdata};
+                    \draw[fill=blue!10] (\ramx - \memwidth/2, \ryzero) rectangle (\ramx + \memwidth/2, \ryone) node[midway, align=center] {\texttt{.data}\\ (Live copy)};
+                    \node[symbol, anchor=north west, yshift=0.1cm] at (\ramx + \memwidth/2, \ryone) {\_edata};
+
+                    % .bss
+                    \node[symbol, anchor=south west] at (\ramx + \memwidth/2, \ryone) {\_sbss};
+                    \draw[fill=white] (\ramx - \memwidth/2, \ryone) rectangle (\ramx + \memwidth/2, \rytwo) node[midway, align=center] {\texttt{.bss}\\ (Zeroed)};
+                    \node[symbol, anchor=north west, yshift=0.1cm] at (\ramx + \memwidth/2, \rytwo) {\_ebss};
+
+                    % Free RAM
+                    \draw[dashed] (\ramx - \memwidth/2, \rytwo) -- (\ramx + \memwidth/2, \rytwo);
+                    \node at (\ramx, \ryfreemid) {Heap / Free RAM};
+
+                    % Stack (at top of RAM)
+                    \node[symbol, anchor=south west] at (\ramx + \memwidth/2, \regionheight) {\_estack};
+                    \draw[fill=gray!15] (\ramx - \memwidth/2, \regionheight - \memh) rectangle (\ramx + \memwidth/2, \regionheight) node[midway, align=center] {Stack};
+
+                \end{tikzpicture}
+
+                El encargado de inicializar la RAM es la función \texttt{Reset\_Handler} que se ejecuta lo primero al arrancar el procesador. Esta función se ubica en \texttt{.text}, y su dirección de memoria se encuentra en un vector predefinido de \texttt{.isr\_vector}. Tras el arranque, se consulta esta dirección, y se salta a la misma, disparando el comportamiento mencionado (copiar los datos \texttt{.data} y limpiar \texttt{.bss}.
+
+            \end{solution}
+
+            
+
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% Cuestiones de ISRs       %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-        \item Compare el funcionamiento del modelo de E/S por encuesta (\emph{polling}) frente al modelo guiado por interrupciones. Analiza las ventajas y desventajas de cada uno en relación con la eficiencia de la CPU, latencia de respuesta y complejidad del código.
+        \item Compare el funcionamiento del modelo de E/S por encuesta (\emph{polling}) frente a las interrupciones. Analiza las ventajas y desventajas de cada uno en relación con la eficiencia de la CPU, latencia de respuesta y complejidad del código.
                 
             \begin{solution}
                 La E/S por polling implica estar continuamente, en un bucle, revisando los registros y periféricos para observar si se han producido interrupciones. La ventaja es que se puede mirar en momentos concretos, la desventaja es que es ineficiente, pues se pierde tiempo consultando en numerosas ocasiones donde no hay nada preparado. La latencia de respuesta, además, depende de la frecuencia de consulta. El código es muy sencillo si sólo se consulta en una ubicación, pero muy complejo si se necesita consultar en diferentes ubicaciones.
@@ -269,13 +420,26 @@
         %%%% Cuestiones de periféricos%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+        \item Explique por qué en microcontroladores modernos la señal de reloj de cada periférico se encuentra desactivada por defecto tras un reinicio. ¿Cómo se gestiona su activación, y qué ocurre si se intenta acceder a los registros de un periférico cuyo reloj no ha sido habilitado previamente?   
+        
+            \begin{solution}
+                Al tener tantos periféricos en un microcontrolador moderno, mantener todos activos todo el tiempo sería ineficiente desde el punto de vista energético. Se aplican técnicas que aíslan los relojes de cada periférico, haciendo que su consumo sea cero en caso de no estar activos. Por tanto, en el caso de intentar acceder a un registro (especialmente en escritura), estos accesos no tendrán efecto, o devolverán datos basura.
+            \end{solution}
+
+
+        \item ¿Qué es un \emph{Watchdog} y qué función tiene dentro de un procesador?
+        
+            \begin{solution}
+                Un \emph{Watchdog} es un temporizador que se reinicia cada cierto tiempo por un evento de procesador. Si pasa un tiempo sin reiniciarse, se acabará disparando y ejecutando una acción. Por ejemplo, es común utilizarlo para verificar que el procesador no se queda atascado en un bucle infinito, reiniciándose al cambiar el PC de valor, y disparándose en caso de que no cambie.
+            \end{solution}
+
         \item ¿Qué sucede al intentar modificar los registros de control de un periférico (por ejemplo \PER{GPIOA}) si no se ha activado previamente su reloj en el registro \PER{RCC} correspondiente? (En este caso, \REG{RCC\_AHB1ENR})
 
             \begin{solution}
                 Como el periférico y sus registros no están recibiendo señal de reloj, no actualizarán sus valores y por tanto las escrituras habrán sido en vano.
             \end{solution}
 
-        \item Si la frecuencia de reloj de entrada del periférico \PER{USART6} es de $16\text{ MHz}$ y se requiere una velocidad de $115200\text{ baudios}$ ¿qué valor entero (aproximadamente) debe cargarse en el registro \REG{USART6\_BRR}?
+        \item Si la frecuencia de reloj de entrada del periférico \PER{USART6} es de $16\text{ MHz}$ y se requiere una velocidad de $115200\text{ baudios}$ ¿qué valor (aproximadamente) debe cargarse en el registro \REG{USART6\_BRR}?
         
             \begin{solution}
                 Para reducir la velocidad de reloj de entrada a la objetivo (los baudios) debemos utilizar un divisor de reloj. En este caso, el valor que le damos está en el registro \REG{BRR}. El valor $v_{BRR}$ necesario será:
@@ -293,10 +457,8 @@
 
         \item En un \PER{GPIO}, los pines se pueden configurar en varios modos: entrada, salida, modo alternativo y modo analógico. ¿Qué funcionalidad nos ofrece el modo alternativo, y cómo se utiliza?
         
-                
             \begin{solution}
-                El modo alternativo permite conectar el \PER{GPIO} con uno de múltiples periféricos que lo comparten. Utilizando este modo les podemos dar salida al exterior y conectarlos con otros elementos externos al procesador, como por ejemplo conectar la \PER{UART} con el ordenador. 
-                .
+                El modo alternativo permite conectar el \PER{GPIO} con uno de múltiples periféricos que lo comparten. Utilizando este modo les podemos dar salida al exterior y conectarlos con otros elementos externos al procesador, como por ejemplo conectar la \PER{UART} con el ordenador.         .
             \end{solution}
 
         \item El gestor de interrupciones externas \PER{EXTI} tiene sólo unas pocas líneas (en concreto 16), muchas menos que la totalidad de pines de los que dispone el procesador (16 pines por puerto, en 10 puertos diferentes). ¿Cuántos pines puedo utilizar simultáneamente para interrumpir al procesador? ¿Qué restricciones existen?
@@ -324,6 +486,21 @@
                     msTicks++;
                 }
             \end{lstlisting}
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% Cuestiones de relojes    %%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        
+        \item Compara las fuentes de reloj internas (HSI, LSI) con las externas por cristal de cuarzo (HSE, LSE) en términos de precisión, y consumo energético. ¿Por qué utilizaríamos un oscilador de cuarzo de 32,768 kHz para el reloj en tiempo real (RTC)?
+        
+            \begin{solution}
+                Las fuentes internas son poco precisas, y se generan mediante osciladores basados en inversores o condensadores. Lo bueno es que están integradas y no hace falta hardware externo. Las fuentes externas basadas en cristal de cuarzo son mucho más precisas, pero ocupan espacio en la PCB. En cuanto al consumo, la principal diferencia radica en la frecuencia, a más frecuencia consumirá más, independientemente de si es externa o interna. El oscilador del RTC sería de 32KHz para ser de baja frecuencia y consumir menos, y de cuarzo para ser preciso y mantener correctamente la cuenta del tiempo.
+            \end{solution}
+
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% Cuestiones de protocolos %%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
         \item Describe la arquitectura física del bus I2C (líneas y funcionamiento). Explica la secuencia de pasos (a nivel lógico) que debe seguir un maestro para realizar una operación de lectura de un registro en un dispositivo esclavo.
         
@@ -331,6 +508,24 @@
                 Un bus I2C tiene dos líneas: reloj y datos. El maestro controla la señal de reloj y, dependiendo de la fase de la comunicación, los datos serán controlados también por maestro o esclavo. A nivel lógico, para leer un registro se manda primero la dirección del esclavo (en modo escritura), seguido del registro a leer. A continuación, se manda de nuevo la dirección del esclavo (en modo lectura), el cual responderá con el dato.
             \end{solution}
 
+        \item En el control de periféricos mediante el bus I2C, el periférico no puede iniciar una transacción. Explique en este contexto si se pueden, y cómo, tratar las interrupciones.
+        
+            \begin{solution}
+                Sí se pueden tratar, pero añadiendo líneas de interrupción externa. A través de éstas se disparará una interrupción que, a nivel de código, está atada a un periférico concreto. A partir de ese momento se hará consulta mediante una lectura I2C para ver qué información ha preparado el periférico.
+            \end{solution}
+
+
+        \item Explique las principales diferencias entre I2C y SPI, en cuanto a líneas utilizadas, direccionamiento de periféricos, e interrupciones.
+        
+            \begin{solution}
+                I2C utiliza únicamente una línea de reloj y datos, mientras que SPI utiliza una línea de reloj, y dos de datos (MOSI y MISO) que permiten transferencias full-duplex simultáneas. SPI utiliza adicionalmente una línea CS por periférico, que permite seleccionar en cada momento el periférico activo, mientras que I2C direcciona a nivel lógico enviando la dirección por el bus. Ninguno de los dos controla interrupciones, que deben alimentarse desde líneas dedicadas y ajenas al protocolo.
+            \end{solution}
+
+
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%Cuestiones de persistencia%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         \item Explica por qué es obligatorio borrar antes de escribir un dato en memoria \PER{FLASH}.
                     
@@ -343,6 +538,11 @@
             \begin{solution}
                 El patrón se incluye para poder saber si los datos que se leen han sido configurados a propósito, o son residuales de algún otro programa, o incluso datos vacíos por ser la primera vez que se inicia el dispositivo. Al arrancar, se comprueban unas posiciones de memoria predefinidas donde, si se encuentra el patrón, se entenderá que los datos que vienen a continuación son válidos. De lo contrario se cargan los valores por defecto.
             \end{solution}
+
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% Cuestiones de multitarea %%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
         \item Explica la diferencia entre un planificador multitarea cooperativo y uno expropiativo. Analiza qué ocurre en un sistema cooperativo si una de las tareas entra en un bucle prolongado o bloqueante.  
         
@@ -362,17 +562,7 @@
                 Por un lado tenemos el \emph{main stack}, donde se almacena la pila del hilo principal, así como las interrupciones cuando son disparadas. Por otro lado están los stacks de tarea, donde cada tarea almacena su pila. Así, se puede dimensionar la pila principal para el peor caso donde se anidasen todas las interrupciones a la vez, y las pilas de los hilos hacerse mucho más pequeñas para almacenar solo el stack de funciones correspondiente, sin preocuparse de memoria extra para interrupciones.
             \end{solution}
         
-        \item Explique por qué en microcontroladores modernos la señal de reloj de cada periférico se encuentra desactivada por defecto tras un reinicio. ¿Cómo se gestiona su activación, y qué ocurre si se intenta acceder a los registros de un periférico cuyo reloj no ha sido habilitado previamente?   
-        
-            \begin{solution}
-                Al tener tantos periféricos en un microcontrolador moderno, mantener todos activos todo el tiempo sería ineficiente desde el punto de vista energético. Se aplican técnicas que aíslan los relojes de cada periférico, haciendo que su consumo sea cero en caso de no estar activos. Por tanto, en el caso de intentar acceder a un registro (especialmente en escritura), estos accesos no tendrán efecto, o devolverán datos basura.
-            \end{solution}
-        
-        \item Compara las fuentes de reloj internas (HSI, LSI) con las externas por cristal de cuarzo (HSE, LSE) en términos de precisión, y consumo energético. ¿Por qué utilizaríamos un oscilador de cuarzo de 32,768 kHz para el reloj en tiempo real (RTC)?
-        
-            \begin{solution}
-                Las fuentes internas son poco precisas, y se generan mediante osciladores basados en inversores o condensadores. Lo bueno es que están integradas y no hace falta hardware externo. Las fuentes externas basadas en cristal de cuarzo son mucho más precisas, pero ocupan espacio en la PCB. En cuanto al consumo, la principal diferencia radica en la frecuencia, a más frecuencia consumirá más, independientemente de si es externa o interna. El oscilador del RTC sería de 32KHz para ser de baja frecuencia y consumir menos, y de cuarzo para ser preciso y mantener correctamente la cuenta del tiempo.
-            \end{solution}
+
 
     \end{enumerate}
 
@@ -380,3 +570,12 @@
     \Closesolutionfile{solutions}
 
 \end{document}
+
+
+
+
+
+
+
+
+%Enunciado: 
