@@ -1,0 +1,896 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\section{Multitarea}
+
+    A menos que tengamos un código que sólo cumpla una función, habitualmente tendremos diversas tareas independientes que se tienen que completar en diferentes momentos, y que potencialmente intercambian información entre ellas. A grandes rasgos, se distinguen dos modelos de multitarea:
+
+    \begin{enumerate}
+        \item En un sistema guiado por \textbf{eventos}, existe una colección de funciones asociadas a un conjunto de eventos externos. La ocurrencia (asíncrona) de eventos determina el secuenciamiento de las funciones, que en caso de eventos simultáneos se ejecutan según prioridad. Los eventos pueden ser detectados mediante \emph{polling} o mediante interrupciones.
+        \item En un sistema guiado por \textbf{tiempo}, las funciones se asocian con un conjunto de instantes de tiempo. En este caso, el transcurso (síncrono) del tiempo es quien determina el secuenciamiento de funciones, también con un atributo de prioridad para casos de ejecuciones simultáneas. El paso del tiempo se mide utilizando un temporizador, que interrumpe con una cierta periodicidad (ticker del sistema).
+    \end{enumerate}
+
+    \subsection{Arquitecturas multitarea cooperativa}\label{sub:cooptask}
+    
+        Existen numerosas arquitecturas para la ejecución multitarea, que generalmente encuentran un compromiso entre simplicidad y capacidad. 
+
+        \subsubsection{Super-loop}
+
+            Un único bucle infinito comprueba, en orden cíclico, el estado de los dispositivos de entrada/salida, y los sirve cuando sea necesario. En este modelo no hay interrupciones. El problema es que las latencias o tiempoes de respuesta son impredecibles, y en el peor caso implican la duración completa de una vuelta al bucle. Además, la arquitectura es frágil pues cualquier cambio en el código altera los tiempos, y el comportamiento del sistema es muy dependiente de cómo esté programada la secuencia de eventos. El esquema básico de Arduino, por ejemplo, funciona con esta arquitectura:
+
+            \begin{lstlisting}
+                void init() {
+                    //configuración de registros, relojes, etc
+                    loop();
+                }
+
+                void loop() {
+                    while (1) {
+                        if (task1_ready)
+                            task1();
+                        if (task2_ready)
+                            task2();
+                        //...
+                    }
+                }
+            \end{lstlisting}
+
+    
+        \subsubsection{Foreground/Background}
+
+            En esencia, un \emph{super-loop} con interrupciones. Varias tareas atienden a los dispositivos de E/S, implementadas como RTI. Estas tareas únicamente marcan eventos, actualizan variables y leen o escriben datos en colas. Se ejecutan en \emph{foreground}, ganando prioridad sobre la tarea principal, y pueden o no anidarse. La tarea principal, siempre en background, realiza un bucle infinito y tiene la mínima prioridad. Irá procesando, poco a poco (siguiendo la estructura del super-loop) las diversas variables que se hayan disparado en las RTI.
+
+            Tiene la problemática de ubicar el grueso del procesamiento de los dispositivos de E/S. Si se coloca este procesamiento en \emph{background}, todos los dispositivos acabarían de facto teniendo la misma prioridad, con retrasos similares a super-loop en el peor de los casos. Si se hace en \emph{foregrond}, las RTI se alargan y se penaliza el tiempo de respuesta.
+
+            \begin{lstlisting}
+                void init() {
+                    //configuración de registros, relojes, etc
+                    //configuración de RTI
+                    loop();
+                }
+
+                void loop() {
+                    while (1) {
+                        if (flag_a) {
+                            flag_a = 0;
+                            task_a();
+                        }
+                        if (flag_b) {
+                            flag_b = 0;
+                            task_b();
+                        }
+                        //...
+                    }
+                }
+
+                void isr_a_handler() {
+                    //trata isr de periférico a
+                    flag_a = 1;
+                }
+
+                void isr_b_handler() {
+                    //trata isr de periférico b
+                    flag_b = 1;
+                }
+            \end{lstlisting}
+
+        \subsubsection{Cola de funciones}
+            
+            Añade prioridad a la ejecución de funciones \emph{foreground/background} mediante una pila de tareas pendientes. Esta pila se llena al ser disparadas las interrupciones. La tarea principal \emph{main} está continuamente de nuevas tareas apareciendo en la pila, y las ejecuta según llegan, respetando por tanto el orden de interrupción, pero no necesariamente de prioridad en caso de que una tarea más prioritaria interrumpiera tras una menos prioritaria.
+
+            \begin{lstlisting}
+                volatile queue_t queue;
+
+                void init() {
+                    //configuración de registros, relojes, etc
+                    //configuración de RTI
+                    loop();
+                }
+
+                void loop() {
+                    while (1) {
+                        if (!queue.empty()) {
+                            ptr_task = queue.dequeue();
+                            (*ptr_task)();
+                        }
+                    }
+                }
+
+                void isr_a_handler() {
+                    //trata isr de periférico a
+                    if (!queue.full())
+                        queue.enqueue(task_a);
+                }
+
+                void isr_b_handler() {
+                    //trata isr de periférico b
+                    if (!queue.full())
+                        queue.enqueue(task_b);
+                }
+            \end{lstlisting}
+
+
+    \subsection{Arquitecturas RTOS}\label{sub:rtostask}
+
+        En las diferentes arquitecturas de multitarea cooperativa, se presenta un problema común: cuando una tarea está en ejecución y se bloquea, siempre bloqueará al resto. Esto presenta un gran problema pues el sistema completo se cae debido a un único punto de fallo. Para solventarlo, se debe dejar de confiar en el aspecto \emph{cooperativo}, y moverse hacia una arquitectura \emph{expropiativa} capaz de retirar de ejecución las tareas. Esto se hace mediante la presencia de un Sistema Operativo en Tiempo Real o \textbf{RTOS}.
+
+        En él, varias tareas RTI atienden a los dispositivos de E/S en \emph{foreground}, mientras que otras tareas en \emph{background} realizan el resto de funciones, ya sean independientes o disparadas en algún momento por las RTI. No hay necesariamente tarea principal o \emph{main}, que desaparece tras configurarse todo el sistema. Para comunicarse entre sí, las tareas utilizan variables compartidas, lo cual implica la necesidad de poder detectar y resolver el acceso a secciones críticas.
+
+        Existe un código de \textbf{kernel} que se encarga de orquestrar todas estas intercomunicaciones. Ofrece mecanismos para sincronizar y comunicar tareas, decide según prioridades la tarea en ejecución, y lo más importante, \textbf{conmuta} la ejecución de tareas dinámicamente. La única desventaja presente en este sistema es la sobrecarga de tener al propio kernel en ejecución, pero sus ventajas lo compensan ampliamente.
+
+        Aunque un RTOS puede ser cooperativo (donde una tarea cede voluntariamente el control al kernel, terminando o mediante señales específicas), lo más habitual es contar con un RTOS expropiativo, donde las excepciones (RTI o propias del kernel) disparan la conmutación de tareas. En este caso, ante los eventos:
+
+        \begin{itemize}
+            \item La tarea en ejecución se interrumpe y el kernel guarda su contexto.
+            \item La RTI se ejecuta y potencialmente pide al kernel la ejecución de cierta tarea.
+            \item El kernel marca como preparada la ejecución de la tarea que esperaba el dato.
+            \item El planificador conmuta a la tarea más prioritaria en cada momento, que podría ser (o no) la nueva tarea encolada.
+        \end{itemize}
+
+        \begin{lstlisting}
+            void main() {
+                // crea tareas
+                // initializa RTOS
+            }
+
+            void isr_a_handler() {
+                //trata isr de periférico a
+                signal(A);
+            }
+
+            void isr_b_handler() {
+                //trata isr de periférico b
+                signal(B);
+            }
+
+            void task_a() {
+                while (1) {
+                    wait(A);
+                    fun_a();
+                }
+            }
+
+            void task_b() {
+                while (1) {
+                    wait(B);
+                    fun_b();
+                }
+            }
+        \end{lstlisting}
+
+        Para la sincronización entre las diferentes tareas (en \emph{foreground} o \emph{background}) se cuenta con mecanismos ofrecidos por el kernel como semáforos, mutex, variables compartidas... propios de un sistema operativo.
+
+        Cuando los datos se comparten entre diversas tareas, existe el problema de la desincronización cuando, por ejemplo, una tarea es interrumpida mientras está consultando los datos proporcionados por otra:
+
+        \begin{lstlisting}
+            volatile uint16_t temp[2]; 
+            void leerTemperatura_isr(void) { 
+                // borraflag de int. pendiente
+                temp[0] = // ...leer del HW... 
+                temp[1] = // ...leer del HW... 
+            } 
+            
+            void main(void) { 
+                uint16_t0, t1; 
+                while(1) { 
+                    // <--- INT: La RTI lee dos valores iguales (7 y 7 por ejemplo)
+                    t0 = temp[0]; 
+                    // <--- INT: La RTI lee dos valores iguales (8 y 8 por ejemplo)
+                    t1 = temp[1]; 
+                    // Sin embargo, la alarma suena al haberse guardado en momentos diferentes
+                    if( t0 != t1 ) 
+                        //suena alarma
+                } 
+            }
+        \end{lstlisting}
+
+        La solución pasa por hacer accesos atómicos a los datos compartidos, deshabilitando las interrupciones al acceder a los datos:
+
+         \begin{lstlisting}
+            while(1) { 
+                INT_DISABLE();
+                t0 = temp[0]; 
+                t1 = temp[1]; 
+                INT_ENABLE();
+                if( t0 != t1 ) 
+                    //suena alarma
+            } 
+        \end{lstlisting}
+
+        Aún así, este mecanismo no es trivial. Hay que asegurarse que toda inactivación es seguida por una activación, y que no se anidan parejas de inactivación/activación, ya que podrían activarse accidentalmente antes de tiempo.
+
+        Las interrupciones son, con todo, la forma idónea de dar respuesta rápida a eventos. Su latencia depende de:
+
+        \begin{enumerate}
+            \item El tiempo máximo en que están deshabilitadas
+            \item El tiempo que tarda en ejecutarse cualquier RTI de mayor prioridad (en caso de interrupciones anidables).
+            \item El tiempo que tarda el procesador en detectar la interrupción y saltar a la RTI.
+            \item El tiempo que se tarda en guardar el contexto y realizar la acción de respuesta.
+        \end{enumerate}
+
+        El código por tanto deberá ser pequeño y eficiente para reducir los tiempos de ejecución y cambio de contexto, las secciones críticas cortas para reducir el tiempo de deshabilitación, y la arquitectura eficiente para detectar y saltar rápido.
+
+
+    \subsection{Correción en aplicaciones multihebra}
+        
+        En una aplicación multihebra (por hebra entendemos un hilo de ejecución, ya sean tareas, interrupciones, etc), la correción debe garantizarse para evitar comportamientos erróneos (bloqueos principalmente).
+        
+        Por un lado, los accesos a secciones críticas (zonas del código donde 2 o más hebras ueden acceder a la vez a un recurso compartido) deben ser atómicos. Es decir, sólo una de las dos puede estar en esa zona del código a la vez, para evitar que los valores se puedan consultar o escribir de manera errónea. Además, una vez se comienza un código atómico, se debe poder completar sin interrupción de otra hebra que acceda al mismo recurso.
+
+        Por otro lado, el código debe diseñarse para ser \emph{reentrante}, esto es, que las variables locales se almacenen en pila y las globales se accedan de manera atómica, permitiendo así la ejecución por parte de varias hebra del mismo código.
+
+        Las secciones críticas siguen 3 principales patrones:
+
+        \begin{itemize}
+            \item \emph{Read-modify-write}: Se lee un valor que se copia localmente, se modifica, y finalmente se actualiza la variable global que lo contiene.
+            \item \emph{Write-read}: Se escribe primero un valor, y se lee esperando que siga presente.
+            \item \emph{Multistep-write}: Se realizan varias escrituras consecutivas a memoria para valores que con una única instrucción no se actualizan (por ejemplo, estructuras complejas).
+        \end{itemize}
+
+        En arquitecturas super-loop, por ejemplo, no hay secciones críticas, pues solo existe una hebra. En arquitecturas foreground/background la hebra principal o \texttt{main} deberá proteger las secciones críticas inhabilitando las interrupciones. En un RTOS cooperativo, el programador controla cuándo cambia el contexto y por tanto podrá proteger las secciones críticas. En un RTOS expropiativo, no se tiene el control sobre los cambios de contexto y todas las hebras deberán proteger las secciones críticas de manera homogénea.
+
+
+    \subsection{Sistemas guiados por tiempo}
+
+        Existen gran número de sistemas empotrados que deben soportar la llamada periódica a determinadas funciones. Por ejemplo al refrescar un display a un cierto número de \emph{frames} por segundo, muestrear sensores a una frecuencia concreta, etc. También es común que se realicen secuencias de acciones con cierta temporización, como por ejemplo en sistemas complejos que deben abrir/cerrar válvulas, mover motores, etc.
+
+        \subsubsection{Primera aproximación}
+
+            Una aproximación mediante sistemas \emph{super-loop} nos llevaría al siguiente modelo de temporización, que falla por motivos obvios al no tenerse en cuenta el propio tiempo de ejecución de la tarea para separar las ejecuciones. Además, la CPU está activa todo el tiempo al realizar esperas activas:
+
+            \begin{lstlisting}
+                void task_init( void ); 
+                void task( void ); 
+                void delay( uint16 ms ); 
+                void main( void ) { 
+                    sys_init(); 
+                    task_init(); 
+                    while( 1 ) { 
+                        delay_ms( 1000 ); 
+                        task(); 
+                    }; 
+                }    
+            \end{lstlisting}
+
+            \begin{center}
+                \definecolor{delaycolor}{RGB}{185, 215, 240}
+                \definecolor{taskcolor}{RGB}{160, 225, 170}
+                \definecolor{driftcolor}{RGB}{210, 50, 40}
+                \definecolor{gridcolor}{RGB}{190, 190, 190}
+
+                \begin{tikzpicture}[
+                    scale=1.0,
+                    >=Stealth,
+                    font=\sffamily\small,
+                    box/.style={draw=black!70, line width=0.7pt}
+                ]
+
+                    % Scale factor: 1.4 cm = 1 second
+                    \def\sx{1.4}
+
+                    % --- 1-Second Grid Lines & Time Axis Labels (0s to 8s) ---
+                    \foreach \t in {0,1,...,8} {
+                        \draw[gridcolor, dashed, line width=0.5pt] (\t*\sx, -0.4) -- (\t*\sx, 3.4);
+                        \node[below, font=\sffamily\footnotesize\bfseries, color=black!70] at (\t*\sx, -0.4) {\t\,s};
+                    }
+
+                    % --- Time Axis ---
+                    %\draw[->, line width=1.2pt] (-0.3, 0) -- (8.6*\sx, 0) node[right, font=\sffamily\bfseries] {Time ($t$)};
+
+                    % --- Ideal Start Grid (Top Reference) ---
+                    \foreach \t in {1,2,...,8} {
+                        \fill[black!70] (\t*\sx, 3.0) circle (2pt);
+                        \draw[black!70, line width=0.8pt] (\t*\sx, 2.85) -- (\t*\sx, 3.15);
+                    }
+
+                    % --- Super-loop Iterations (Showing delay + task execution) ---
+
+                    % Iteration 1: 0.00s to 1.25s
+                    \draw[box, fill=delaycolor] (0*\sx, 0.4) rectangle (1.0*\sx, 1.2);
+                    \node[font=\sffamily\tiny] at (0.5*\sx, 0.8) {\texttt{delay(1000)}};
+                    \draw[box, fill=taskcolor] (1.0*\sx, 0.4) rectangle (1.25*\sx, 1.2);
+                    %\node[font=\sffamily\fontsize{5}{6}\selectfont] at (1.125*\sx, 0.8) {\texttt{task()}};
+
+                    % Iteration 2: 1.25s to 2.50s
+                    \draw[box, fill=delaycolor] (1.25*\sx, 0.4) rectangle (2.25*\sx, 1.2);
+                    \node[font=\sffamily\tiny] at (1.75*\sx, 0.8) {\texttt{delay(1000)}};
+                    \draw[box, fill=taskcolor] (2.25*\sx, 0.4) rectangle (2.50*\sx, 1.2);
+                    %\node[font=\sffamily\fontsize{5}{6}\selectfont] at (2.375*\sx, 0.8) {\texttt{task()}};
+
+                    % Iteration 3: 2.50s to 3.75s
+                    \draw[box, fill=delaycolor] (2.50*\sx, 0.4) rectangle (3.50*\sx, 1.2);
+                    \node[font=\sffamily\tiny] at (3.00*\sx, 0.8) {\texttt{delay(1000)}};
+                    \draw[box, fill=taskcolor] (3.50*\sx, 0.4) rectangle (3.75*\sx, 1.2);
+                    %\node[font=\sffamily\fontsize{5}{6}\selectfont] at (3.625*\sx, 0.8) {\texttt{task()}};
+
+                    % Iteration 4: 3.75s to 5.00s
+                    \draw[box, fill=delaycolor] (3.75*\sx, 0.4) rectangle (4.75*\sx, 1.2);
+                    \node[font=\sffamily\tiny] at (4.25*\sx, 0.8) {\texttt{delay(1000)}};
+                    \draw[box, fill=taskcolor] (4.75*\sx, 0.4) rectangle (5.00*\sx, 1.2);
+                    %\node[font=\sffamily\fontsize{5}{6}\selectfont] at (4.875*\sx, 0.8) {\texttt{task()}};
+
+                    % Iteration 5: 5.00s to 6.25s
+                    \draw[box, fill=delaycolor] (5.00*\sx, 0.4) rectangle (6.00*\sx, 1.2);
+                    \node[font=\sffamily\tiny] at (5.50*\sx, 0.8) {\texttt{delay(1000)}};
+                    \draw[box, fill=taskcolor] (6.00*\sx, 0.4) rectangle (6.25*\sx, 1.2);
+                    %\node[font=\sffamily\fontsize{5}{6}\selectfont] at (6.125*\sx, 0.8) {\texttt{task()}};
+
+                    % Iteration 6: 6.25s to 7.50s
+                    \draw[box, fill=delaycolor] (6.25*\sx, 0.4) rectangle (7.25*\sx, 1.2);
+                    \node[font=\sffamily\tiny] at (6.75*\sx, 0.8) {\texttt{delay(1000)}};
+                    \draw[box, fill=taskcolor] (7.25*\sx, 0.4) rectangle (7.50*\sx, 1.2);
+                    %\node[font=\sffamily\fontsize{5}{6}\selectfont] at (7.375*\sx, 0.8) {\texttt{task()}};
+
+                    % --- Drift Callouts & Arrows ---
+
+                    % 1st Run (t = 1.0s, no offset yet)
+                    \draw[<-, line width=0.8pt, black!70] (1.0*\sx, 1.25) -- (1.0*\sx, 1.9) 
+                        node[above, font=\sffamily\tiny\bfseries, color=black!80] {1st \texttt{task()}: $1.0\text{s}$};
+
+                    % 2nd Run (t = 2.25s, drift = +T_task)
+                    \draw[<-, line width=0.8pt, driftcolor] (2.25*\sx, 1.25) -- (2.25*\sx, 1.9) 
+                        node[above, font=\sffamily\tiny\bfseries, color=driftcolor] {Drift: $+T_{\text{task}}$};
+                    \draw[driftcolor, <->, line width=0.6pt] (2.0*\sx, 1.55) -- (2.25*\sx, 1.55);
+
+                    % 3rd Run (t = 3.50s, drift = +2*T_task)
+                    \draw[<-, line width=0.8pt, driftcolor] (3.50*\sx, 1.25) -- (3.50*\sx, 1.9) 
+                        node[above, font=\sffamily\tiny\bfseries, color=driftcolor] {Drift: $+2T_{\text{task}}$};
+                    \draw[driftcolor, <->, line width=0.6pt] (3.0*\sx, 1.55) -- (3.50*\sx, 1.55);
+
+                    % 4th Run (t = 4.75s, drift = +3*T_task)
+                    \draw[<-, line width=0.8pt, driftcolor] (4.75*\sx, 1.25) -- (4.75*\sx, 1.9) 
+                        node[above, font=\sffamily\tiny\bfseries, color=driftcolor] {Drift: $+3T_{\text{task}}$};
+
+                    % 6th Run (t = 7.25s, drift = +5*T_task)
+                    \draw[<-, line width=0.8pt, driftcolor] (7.25*\sx, 1.25) -- (7.25*\sx, 1.9) 
+                        node[above, font=\sffamily\tiny\bfseries, color=driftcolor] {Drift: $+5T_{\text{task}}$};
+
+                    % Period Brace
+                    \draw[thick, decorate, decoration={brace, amplitude=5pt, mirror}] (1.25*\sx, 0.2) -- (2.50*\sx, 0.2) 
+                        node[pos=0.5, below=6pt, font=\sffamily\scriptsize] {Actual Period $T_{\text{loop}} = 1000\,\text{ms} + T_{\text{task}}$};
+
+                \end{tikzpicture}
+            \end{center}
+
+        \subsubsection{Segunda aproximación}
+
+            Otra aproximación, que podría mejorar a la anterior, y evita tener a la CPU dormida, es tener un timer que se dispare cada cierto tiempo. Por ejemplo:
+
+            \begin{lstlisting}
+                timer0_isr() {
+                    // borrar bits de ISR pendiente
+                    // no hace nada más, sólo saca del sleep();
+                }
+
+                void main(void) { 
+                    SET_TIMER_MS(timer0, 1000); 
+
+                    while( 1 ) { 
+                        sleep(); //entra en modo de sleep, se despierta con ISR
+                        task();  //realiza la tarea
+                    } 
+                }
+            \end{lstlisting}
+
+            Esta aproximación funcionará mientras:
+            \begin{enumerate}
+                \item El tiempo de \texttt{task()} sea inferior siempre a 1 segundo.
+                \item Sólo exista una única fuente de interrupción.
+            \end{enumerate}
+
+            Si se inclumple la primera, la tarea no se disparará el número de veces adecuado, saltando ciclos. Si se incumple la segunda, el problema vendrá porque otras fuentes de interrupción hagan que la llamada a \texttt{sleep()} acabe antes de tiempo, disparándose en más momentos que sólo cada segundo.
+
+
+            \begin{center}
+                % Definición de colores
+                \definecolor{sleepcolor}{RGB}{220, 228, 242}
+                \definecolor{taskcolor}{RGB}{160, 225, 170}
+                \definecolor{isrcolor}{RGB}{220, 50, 40}
+                \definecolor{extisrcolor}{RGB}{230, 140, 20}
+                \definecolor{gridcolor}{RGB}{210, 210, 210}
+
+                \begin{tikzpicture}[
+                    scale=1.0,
+                    >=Stealth,
+                    font=\sffamily\small,
+                    box/.style={draw=black!70, line width=0.7pt}
+                ]
+
+                    % Factor de escala horizontal (1.9 cm = 1 segundo)
+                    \def\sx{1.9}
+
+                    % =========================================================================
+                    % 1. CASO NORMAL: T_task < 1s, Única fuente de interrupción
+                    % =========================================================================
+                    \node[anchor=west, font=\sffamily\bfseries\small, color=black!90] at (-0.4, 6.2) 
+                        {1. Funcionamiento Correcto ($T_{\text{task}} < 1\,\text{s}$, única ISR)};
+
+                    % Rejilla de tiempo
+                    \foreach \t in {0,1,2,3,4} {
+                        \draw[gridcolor, dashed, line width=0.5pt] (\t*\sx, 4.0) -- (\t*\sx, 5.8);
+                        \node[below, font=\sffamily\tiny\bfseries, color=black!60] at (\t*\sx, 4.0) {\t\,s};
+                    }
+                    \draw[->, line width=1pt] (-0.3, 4.3) -- (4.4*\sx, 4.3) node[right, font=\sffamily\tiny\bfseries] {$t$};
+
+                    % ISR Triggers (Timer0 cada 1.0s)
+                    \foreach \t in {1,2,3,4} {
+                        \draw[->, line width=1.1pt, isrcolor] (\t*\sx, 5.6) -- (\t*\sx, 5.05) 
+                            node[pos=0, above, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=isrcolor] {Timer0 ISR};
+                    }
+
+                    % Bloques CPU (Sleep vs task)
+                    % t=0 a 1.0s: Sleep
+                    \draw[box, fill=sleepcolor] (0*\sx, 4.4) rectangle (1.0*\sx, 5.0);
+                    \node[font=\sffamily\fontsize{7}{8}\selectfont, color=black!70] at (0.5*\sx, 4.7) {\texttt{sleep()}};
+
+                    % Ciclos 1, 2, 3, 4
+                    \foreach \i in {1,2,3} {
+                        % Task
+                        \draw[box, fill=taskcolor] (\i*\sx, 4.4) rectangle ({(\i+0.35)*\sx}, 5.0);
+                        \node[font=\sffamily\fontsize{6}{7}\selectfont] at ({(\i+0.175)*\sx}, 4.7) {\texttt{task()}};
+                        % Sleep posterior
+                        \draw[box, fill=sleepcolor] ({(\i+0.35)*\sx}, 4.4) rectangle ({(\i+1.0)*\sx}, 5.0);
+                        \node[font=\sffamily\fontsize{7}{8}\selectfont, color=black!70] at ({(\i+0.675)*\sx}, 4.7) {\texttt{sleep()}};
+                    }
+
+
+                    % =========================================================================
+                    % 2. FALLO 1: T_task > 1s (Se saltan ciclos)
+                    % =========================================================================
+                    \node[anchor=west, font=\sffamily\bfseries\small, color=isrcolor] at (-0.4, 3.1) 
+                        {2. Incumplimiento 1 ($T_{\text{task}} > 1\,\text{s}$)};
+
+                    % Rejilla de tiempo
+                    \foreach \t in {0,1,2,3,4} {
+                        \draw[gridcolor, dashed, line width=0.5pt] (\t*\sx, 0.9) -- (\t*\sx, 2.7);
+                        \node[below, font=\sffamily\tiny\bfseries, color=black!60] at (\t*\sx, 0.9) {\t\,s};
+                    }
+                    \draw[->, line width=1pt] (-0.3, 1.2) -- (4.4*\sx, 1.2) node[right, font=\sffamily\tiny\bfseries] {$t$};
+
+                    % ISR Triggers
+                    \draw[->, line width=1.1pt, isrcolor] (1.0*\sx, 2.4) -- (1.0*\sx, 1.95) node[pos=0, above, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=isrcolor] {Timer0 ISR};
+                    \draw[->, line width=1.1pt, isrcolor!50] (2.0*\sx, 2.4) -- (2.0*\sx, 1.95) node[pos=0, above, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=isrcolor!50] {ISR perdida};
+                    \draw[->, line width=1.1pt, isrcolor] (3.0*\sx, 2.4) -- (3.0*\sx, 1.95) node[pos=0, above, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=isrcolor] {Timer0 ISR};
+
+                    % Bloques CPU
+                    \draw[box, fill=sleepcolor] (0*\sx, 1.3) rectangle (1.0*\sx, 1.9);
+                    \node[font=\sffamily\fontsize{7}{8}\selectfont, color=black!70] at (0.5*\sx, 1.6) {\texttt{sleep()}};
+
+                    % Tarea larga (1.3s de duración, desde 1.0s hasta 2.3s)
+                    \draw[box, fill=taskcolor!80!red] (1.0*\sx, 1.3) rectangle (2.3*\sx, 1.9);
+                    \node[font=\sffamily\fontsize{6}{7}\selectfont, align=center] at (1.65*\sx, 1.6) {\texttt{task()} larga ($>1\,\text{s}$)};
+
+                    % Sleep diferido (2.3s a 3.0s)
+                    \draw[box, fill=sleepcolor] (2.3*\sx, 1.3) rectangle (3.0*\sx, 1.9);
+                    \node[font=\sffamily\fontsize{6}{7}\selectfont, color=black!70] at (2.65*\sx, 1.6) {\texttt{sleep()}};
+
+                    % Siguiente Task (3.0s a 4.3s)
+                    \draw[box, fill=taskcolor!80!red] (3.0*\sx, 1.3) rectangle (4.3*\sx, 1.9);
+                    \node[font=\sffamily\fontsize{6}{7}\selectfont] at (3.65*\sx, 1.6) {\texttt{task()}};
+
+                    % =========================================================================
+                    % 3. FALLO 2: Múltiples fuentes de interrupción (Despertar prematuro)
+                    % =========================================================================
+                    \node[anchor=west, font=\sffamily\bfseries\small, color=extisrcolor!90!black] at (-0.4, -0.2) 
+                        {3. Incumplimiento 2 (Otra fuente de ISR):};
+
+                    % Rejilla de tiempo
+                    \foreach \t in {0,1,2,3,4} {
+                        \draw[gridcolor, dashed, line width=0.5pt] (\t*\sx, -2.4) -- (\t*\sx, -0.6);
+                        \node[below, font=\sffamily\tiny\bfseries, color=black!60] at (\t*\sx, -2.4) {\t\,s};
+                    }
+                    \draw[->, line width=1pt] (-0.3, -2.1) -- (4.4*\sx, -2.1) node[right, font=\sffamily\tiny\bfseries] {$t$};
+
+                    % ISR Triggers
+                    \draw[->, line width=1.1pt, isrcolor] (1.0*\sx, -0.9) -- (1.0*\sx, -1.35) node[pos=0, above, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=isrcolor] {Timer0 ISR};
+                    
+                    % Interrupción ajena (ej. GPIO a los 1.6s)
+                    \draw[->, line width=1.1pt, extisrcolor] (1.6*\sx, -0.9) -- (1.6*\sx, -1.35) 
+                        node[pos=0, above, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=extisrcolor, align=center] {ISR};
+
+                    \draw[->, line width=1.1pt, isrcolor] (2.0*\sx, -0.9) -- (2.0*\sx, -1.35) node[pos=0, above, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=isrcolor] {Timer0 ISR};
+
+                    % Bloques CPU
+                    \draw[box, fill=sleepcolor] (0*\sx, -2.0) rectangle (1.0*\sx, -1.4);
+                    \node[font=\sffamily\fontsize{7}{8}\selectfont, color=black!70] at (0.5*\sx, -1.7) {\texttt{sleep()}};
+
+                    % Task 1 (1.0s a 1.3s)
+                    \draw[box, fill=taskcolor] (1.0*\sx, -2.0) rectangle (1.3*\sx, -1.4);
+                    \node[font=\sffamily\fontsize{5}{6}\selectfont] at (1.15*\sx, -1.7) {\texttt{task()}};
+
+                    % Sleep interrumpido (1.3s a 1.6s)
+                    \draw[box, fill=sleepcolor] (1.3*\sx, -2.0) rectangle (1.6*\sx, -1.4);
+                    \node[font=\sffamily\fontsize{5}{6}\selectfont, color=black!70] at (1.45*\sx, -1.7) {\texttt{sleep()}};
+
+                    % Task prematuro (1.6s a 1.9s)
+                    \draw[box, fill=taskcolor!80!orange] (1.6*\sx, -2.0) rectangle (1.9*\sx, -1.4);
+                    \node[font=\sffamily\fontsize{5}{6}\selectfont, align=center] at (1.75*\sx, -1.7) {\texttt{task()}};
+
+                    % Short Sleep (1.9s a 2.0s)
+                    \draw[box, fill=sleepcolor] (1.9*\sx, -2.0) rectangle (2.0*\sx, -1.4);
+
+                    % Task programado (2.0s a 2.3s)
+                    \draw[box, fill=taskcolor] (2.0*\sx, -2.0) rectangle (2.3*\sx, -1.4);
+                    \node[font=\sffamily\fontsize{5}{6}\selectfont] at (2.15*\sx, -1.7) {\texttt{task()}};
+
+                    % Sleep posterior
+                    \draw[box, fill=sleepcolor] (2.3*\sx, -2.0) rectangle (3.0*\sx, -1.4);
+                    \node[font=\sffamily\fontsize{7}{8}\selectfont, color=black!70] at (2.65*\sx, -1.7) {\texttt{sleep()}};
+
+                \end{tikzpicture}
+            \end{center}
+
+        \subsubsection{Tercera aproximación}
+            Una opción que sí sería funcional implicaría ejecutar la tarea en la propia ISR. Esto no es del todo recomendable, ya que las ISRs se deben mantener lo más escuetas posibles. Aunque no podemos solucionar el problema de que la tarea dure más de un segundo, sí podemos resolver el problema de que se lancen varias ISRs diferentes, mediante la inclusión de un flag que nos indique, al despertar del \texttt{sleep()}, si queremos de verdad ejecutar la tarea.
+
+            \begin{lstlisting}
+                uint32_t flag = 0;
+
+                timer0_isr() {
+                    // borrar bits de ISR pendiente
+                    flag = 1;
+                }
+
+                void main(void) { 
+                    SET_TIMER_MS(timer0, 1000); 
+
+                    while( 1 ) { 
+                        sleep(); //entra en modo de sleep, se despierta con ISR
+                        if (flag) {     //si flag está a 0, volverá a sleep()
+                            flag = 0;   //marca flag a 0 
+                            task();     //realiza la tarea
+                        }
+                    } 
+                }
+            \end{lstlisting}
+
+            
+            \begin{center}
+                % Definición de colores
+                \definecolor{sleepcolor}{RGB}{220, 228, 242}
+                \definecolor{taskcolor}{RGB}{160, 225, 170}
+                \definecolor{checkcolor}{RGB}{255, 225, 170}
+                \definecolor{isrcolor}{RGB}{220, 50, 40}
+                \definecolor{extisrcolor}{RGB}{230, 140, 20}
+                \definecolor{gridcolor}{RGB}{210, 210, 210}
+
+                \begin{tikzpicture}[
+                    scale=1.0,
+                    >=Stealth,
+                    font=\sffamily\small,
+                    box/.style={draw=black!70, line width=0.7pt}
+                ]
+
+                    % Factor de escala horizontal (2.2 cm = 1 segundo)
+                    \def\sx{2.2}
+
+                    % Título del diagrama
+                    \node[anchor=west, font=\sffamily\bfseries\small, color=black!90] at (-0.4, 3.4) 
+                        {Filtrado mediante (\texttt{flag})};
+
+                    % --- Rejilla de tiempo y eje ---
+                    \foreach \t in {0,1,2,3} {
+                        \draw[gridcolor, dashed, line width=0.5pt] (\t*\sx, -0.6) -- (\t*\sx, 2.8);
+                        \node[below, font=\sffamily\tiny\bfseries, color=black!60] at (\t*\sx, -0.6) {\t\,s};
+                    }
+                    \draw[->, line width=1pt] (-0.3, -0.3) -- (3.4*\sx, -0.3) node[right, font=\sffamily\tiny\bfseries] {$t$};
+
+                    % --- Señales de Interrupción (Eventos ISR) ---
+
+                    % Timer0 ISR a los 1.0s (flag = 1)
+                    \draw[->, line width=1.1pt, isrcolor] (1.0*\sx, 2.5) -- (1.0*\sx, 1.95) 
+                        node[pos=0, above, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=isrcolor, align=center] 
+                        {Timer0 ISR\\[-1pt]\tiny (\texttt{flag = 1})};
+
+                    % Timer0 ISR a los 2.0s (flag = 1)
+                    \draw[->, line width=1.1pt, isrcolor] (2.0*\sx, 2.5) -- (2.0*\sx, 1.95) 
+                        node[pos=0, above, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=isrcolor, align=center] 
+                        {Timer0 ISR\\[-1pt]\tiny (\texttt{flag = 1})};
+
+
+                    % --- Traza de Ejecución de la CPU ---
+
+                    % 0.0s a 1.0s: Sleep inicial
+                    \draw[box, fill=sleepcolor] (0*\sx, 1.3) rectangle (1.0*\sx, 1.9);
+                    \node[font=\sffamily\fontsize{7}{8}\selectfont, color=black!70] at (0.5*\sx, 1.6) {\texttt{sleep()}};
+
+                    % 1.0s: Wakup por Timer0 -> flag=1 -> task()
+                    \draw[box, fill=taskcolor] (1.0*\sx, 1.3) rectangle (1.35*\sx, 1.9);
+                    \node[font=\sffamily\fontsize{6}{7}\selectfont, align=center] at (1.175*\sx, 1.6) {\texttt{if(flag)}\\[-2pt]\texttt{task()}};
+
+                    % 1.35s a 1.50s: Sleep
+                    \draw[box, fill=sleepcolor] (1.35*\sx, 1.3) rectangle (1.50*\sx, 1.9);
+
+                    % 1.50s a 1.58s: Wakeup por ISR Ajena -> if(flag) evalúa FALSO -> Vuelve inmediatamente a sleep
+                    \draw[box, fill=checkcolor] (1.50*\sx, 1.3) rectangle (1.58*\sx, 1.9);
+
+                    % 1.58s a 2.00s: Sleep continuo
+                    \draw[box, fill=sleepcolor] (1.58*\sx, 1.3) rectangle (2.00*\sx, 1.9);
+                    \node[font=\sffamily\fontsize{7}{8}\selectfont, color=black!70] at (1.79*\sx, 1.6) {\texttt{sleep()}};
+
+                    % 2.00s: Wakeup por Timer0 -> task()
+                    \draw[box, fill=taskcolor] (2.0*\sx, 1.3) rectangle (2.35*\sx, 1.9);
+                    \node[font=\sffamily\fontsize{6}{7}\selectfont, align=center] at (2.175*\sx, 1.6) {\texttt{if(flag)}\\[-2pt]\texttt{task()}};
+
+                    % 2.35s a 3.00s: Sleep
+                    \draw[box, fill=sleepcolor] (2.35*\sx, 1.3) rectangle (3.0*\sx, 1.9);
+                    \node[font=\sffamily\fontsize{7}{8}\selectfont, color=black!70] at (2.675*\sx, 1.6) {\texttt{sleep()}};
+
+
+                    % --- Anotaciones explicativas ---
+
+                    % Llamada de atención al chequeo falso a los 1.5s
+                    \draw[<-, line width=0.8pt, extisrcolor] (1.54*\sx, 1.25) -- (1.54*\sx, 0.4) 
+                        node[below, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=extisrcolor, align=center] 
+                        {\texttt{if(flag)} evalúa a \textbf{0} (falso);\\se omite \texttt{task()} y vuelve a \texttt{sleep()}};
+
+                \end{tikzpicture}
+            \end{center}
+
+            Con este sistema, se pueden tener incluso varias tareas, disparadas por varios timers. También que un mismo timer, en función de una cuenta del número de disparos, active uno u otro flag para diferentes tareas. Mientras los tiempos de ejecución sean deterministas, e inferiores al periodo de disparo de el/los timer/s, cabrán en los mismos y el código funcionará correctamente.
+
+        \subsubsection{Polling con espera en tareas periódicas}
+
+            Una cuestión importante, y que hay que evitar en cualquier tipo de ejecución de tareas periódicas, es el polling con espera activa (por ejemplo esperando a que un periférico esté activo). Ya que, si el periférico nunca se activa, o tiene un error, nos quedaremos bloqueados esperando a que devuelva un control que nunca volverá.
+
+            Para solucionar este problema, se puede utilizar polling con timeout (dando un error tras un cierto tiempo), polling con consulta (si no está disponible, devuelve inmediatamente un error), o un polling ciego (sin comprobación) si se tiene la certeza de que el dato está disponible (por ejemplo en sistemas sincronizados, aunque no es recomendable).
+
+
+    \subsection{Planificadores cooperativos}
+
+        Cuando se dispone de múltiples tareas, una primera aproximación puede incluir el preprogramar su orden de ejecución mediante una lista que se ejecuta periódicamente. Sin embargo, estos sistemas (llamados \emph{cyclic-executive}) son muy poco flexibles, especialmente cuando se interactúa con personas o entornos que pueden generar interrupciones en momentos arbitrarios. 
+
+        Como solución, se introduce el concepto de planificadores. En las \Cref{sub:cooptask,sub:rtostask} hemos visto diferentes ideas de cómo varias tareas pueden ejecutarse, pero no hemos explicado el concepto de prioridades entre ellas, y cómo un planificador puede (y debe) evaluar entre las tareas disponibles, cuál se debería ejecutar (basándose en prioridades, deadlines de ejecución, etc).
+
+
+        En todo momento existe una úncia tarea en ejecución, y se ejecutan hasta completarse, sin ser interrumpidas por otras. Las tareas se preparan con periodicidad fija (p.ej disparándose con un timer), se encolan en una lista de tareas preparadas y, cuando la CPU está libre, elige entre las mismas siguiendo algún criterio (puede ser simplemente el orden de cola, o algo más complejo basándose en prioridades).
+
+        Se necesita una fuente de interrupción periódica que dispara la ejecución de las tareas y, opcionalmente, pueden existir otras interrupciones que, en caso de poder ejecutarse simultáneamente, deberán proteger sus recursos mediante exclusión mutua.
+
+        Este tipo de planificador es muy simple, y la ejecución de tareas es predecible y fiable. Los recursos habitualmente no serán compartidos, por lo que no suele haber muchas secciones críticas. Sin embargo, tareas poco prioritarias, o eventos externos, pueden sufrir retrasos grandes debido a que la única forma de cambiar de tarea, es que la tarea actual termine su ejecución.
+
+        Las tareas se suelen definir por una estructura como la siguiente, llamada bloque de control de tarea:
+
+        \begin{lstlisting}
+            typedef struct { 
+                void (* pfunction) (void);  //puntero a función ejecutora
+                uint32 period; //periodo entre 2 ejecuciones
+                uint32 ticks;  //cuenta de ticks desde la última ejecución
+                boolean ready; //1 si está lista para ejecución
+            } task_t; 
+            
+            #define MAX_TASKS (10) 
+            task_t tasks[MAX_TASKS];   
+        \end{lstlisting}
+
+        A su vez, la gestión se divide en un planificador (que marca las tareas como listas), y un despachador o lanzador que las ejecuta:
+
+        \begin{lstlisting}
+            //la rutina del timer es quien, de cuando en cuando,
+            //evalúa la planificación de tareas
+            timer0_isr() {
+                // borrar bits de ISR pendiente
+                scheduler();
+            }
+
+            void scheduler (void) { 
+                uint32 id; 
+                for (id=0; id<MAX_TASKS; id++) 
+                    if (tasks[id].pfunction) 
+                        if (++tasks[id].ticks == tasks[id].period) { 
+                            //si una tarea llega a su periodo, se marca como READY
+                            //pero nunca expropia a otra (tras la ISR se volverá
+                            //a la ejecución en curso)
+                            tasks[id].ticks = 0;
+                            tasks[id].ready = TRUE;
+                        };
+            }
+
+            void dispacher( void ) { 
+                uint32 id; 
+                for (id=0; id<MAX_TASKS; id++) 
+                    //el dispatcher ejecuta las tareas que están
+                    //ready, una tras otra
+                    if (tasks[id].ready == TRUE) { 
+                        (*tasks[id].pfunction)(); 
+                        tasks[id].ready = FALSE; 
+                    } 
+            }
+
+            void main (void) { 
+                sys_init(); 
+                scheduler_init(); 
+
+                TIMER_INIT(timer0, 1000); 
+                while (1) { 
+                    if (!tasks_ready()) //duerme hasta que interrumpa el scheduler
+                        sleep();    
+                    //tras lo cual puede haber tareas listas para despachar
+                    dispacher(); 
+                    //si no las hubiera, o tras ejecutar, vuelvo a dormir
+                }
+            }
+        \end{lstlisting}
+        
+
+        \begin{center}
+            % Definición de colores
+            \definecolor{sleepcolor}{RGB}{220, 228, 242}
+            \definecolor{isrcolor}{RGB}{230, 80, 50}
+            \definecolor{schedcolor}{RGB}{245, 170, 70}
+            \definecolor{dispcolor}{RGB}{140, 190, 230}
+            \definecolor{t1color}{RGB}{160, 225, 170}
+            \definecolor{t2color}{RGB}{140, 205, 235}
+            \definecolor{t3color}{RGB}{215, 175, 235}
+            \definecolor{gridcolor}{RGB}{210, 210, 210}
+
+            \begin{tikzpicture}[
+                scale=1.0,
+                >=Stealth,
+                font=\sffamily\small,
+                box/.style={draw=black!70, line width=0.6pt}
+            ]
+
+                % =========================================================================
+                % PARTE 1: VISIÓN GENERAL TEMPORAL (0s a 8s)
+                % =========================================================================
+                \def\sx{1.4} % Escala horizontal: 1.4 cm = 1 segundo
+
+                \node[anchor=west, font=\sffamily\bfseries\large, color=black!90] at (-0.4, 7.8) 
+                    {Planificación Cooperativa };
+
+                % Rejilla de tiempo (0s a 8s)
+                \foreach \t in {0,1,...,8} {
+                    \draw[gridcolor, dashed, line width=0.5pt] (\t*\sx, 3.8) -- (\t*\sx, 7.2);
+                    \node[below, font=\sffamily\tiny\bfseries, color=black!60] at (\t*\sx, 3.8) {\t\,s};
+                }
+                \draw[->, line width=1pt] (-0.3, 4.1) -- (8.6*\sx, 4.1) node[right, font=\sffamily\tiny\bfseries] {$t$};
+
+                % Disparos de Timer ISR (cada 1s)
+                \foreach \t in {1,2,...,8} {
+                    \draw[->, line width=1pt, isrcolor] (\t*\sx, 7.2) -- (\t*\sx, 6.7) 
+                        node[pos=0, above, font=\sffamily\fontsize{5}{6}\selectfont\bfseries, color=isrcolor] {ISR};
+                }
+
+                % --- Filas de Ejecución de Tareas ---
+                % Fila Task 1 (Periodo 1s)
+                \node[anchor=east, font=\sffamily\fontsize{7}{8}\selectfont\bfseries, color=black!80] at (-0.3, 6.2) {Task 1 (P=1s)};
+                \foreach \t in {1,2,...,8} {
+                    \draw[box, fill=t1color] (\t*\sx, 6.0) rectangle ({(\t+0.2)*\sx}, 6.4);
+                }
+
+                % Fila Task 2 (Periodo 2s)
+                \node[anchor=east, font=\sffamily\fontsize{7}{8}\selectfont\bfseries, color=black!80] at (-0.3, 5.3) {Task 2 (P=2s)};
+                \foreach \t in {2,4,6,8} {
+                    \draw[box, fill=t2color] ({(\t+0.2)*\sx}, 5.1) rectangle ({(\t+0.4)*\sx}, 5.5);
+                }
+
+                % Fila Task 3 (Periodo 3s)
+                \node[anchor=east, font=\sffamily\fontsize{7}{8}\selectfont\bfseries, color=black!80] at (-0.3, 4.4) {Task 3 (P=3s)};
+                \foreach \t in {3,6} {
+                    \draw[box, fill=t3color] ({(\t+0.4)*\sx}, 4.2) rectangle ({(\t+0.65)*\sx}, 4.6);
+                }
+
+                % Destacado del segundo 6 (Coincidencia de las 3 tareas)
+                \draw[draw=isrcolor, line width=1pt, dashed, fill=isrcolor!5, fill opacity=0.3] 
+                    (5.85*\sx, 3.9) rectangle (6.75*\sx, 6.6);
+
+
+                % =========================================================================
+                % PARTE 2: DETALLE DE INTERACCIÓN EN t = 6s
+                % =========================================================================
+                \node[anchor=west, font=\sffamily\bfseries\large, color=black!90] at (-0.4, 2.7) 
+                    {Interacción en $t = 6\,\text{s}$ (ISR $\rightarrow$ Scheduler $\rightarrow$ Dispatcher $\rightarrow$ Tareas)};
+
+                \def\z{2.7} % Factor de zoom horizontal para el segundo 6
+
+                % --- Bloques de flujo en el segundo 6 ---
+
+                % 1. Sleep previo (< 6.0s)
+                \draw[box, fill=sleepcolor] (-0.3, -2.5) rectangle (0, 2.1);
+                \node[rotate=90, font=\sffamily\fontsize{7}{8}\selectfont, color=black!60] at (-0.15, -0.2) {\texttt{sleep()}};
+
+                
+                \draw[box, fill=schedcolor] (0, 1.3) rectangle (0.4*\z, 1.9);
+                \node[font=\sffamily\fontsize{6}{7}\selectfont\bfseries, align=center] at (0.2*\z, 1.6) {\texttt{scheduler}};
+
+                % Traza de estado de flags en scheduler()
+                \node[anchor=west, font=\sffamily\fontsize{6}{7}\selectfont, color=black!80] at (0, 2.15) 
+                    {Actualiza: \texttt{tasks[0..2].ready = TRUE}};
+
+                % 3. Retorno de ISR y llamada al dispatcher()
+                \draw[box, fill=dispcolor] (0.4*\z, 0.6) rectangle (0.7*\z, 1.2);
+                \node[font=\sffamily\fontsize{5}{6}\selectfont, align=center] at (0.55*\z, 0.9) {\texttt{ready?}\\[-2pt]ID=0};
+
+                % 4. Ejecución secuencial de Task 1
+                \draw[->, line width=0.7pt, dashed] (0.7*\z, 0.9) -- (0.7*\z, -0.1);
+                \draw[box, fill=t1color] (0.7*\z, -0.4) rectangle (1.2*\z, 0.2);
+                \node[font=\sffamily\fontsize{7}{8}\selectfont\bfseries, align=center] at (0.95*\z, -0.1) {\texttt{task1()}\\[-2pt]\tiny P=1s (ID=0)};
+                \node[font=\sffamily\fontsize{5}{6}\selectfont, color=black!70] at (0.95*\z, -0.55) {\texttt{ready[0]=FALSE}};
+
+                % 5. Dispatcher pasa a Task 2
+                \draw[box, fill=dispcolor] (1.2*\z, 0.6) rectangle (1.4*\z, 1.2);
+                \node[font=\sffamily\fontsize{5}{6}\selectfont, align=center] at (1.3*\z, 0.9) {\texttt{ready?}\\[-2pt]ID=1};
+
+                % 6. Ejecución secuencial de Task 2
+                \draw[->, line width=0.7pt, dashed] (1.4*\z, 0.9) -- (1.4*\z, -0.9);
+                \draw[box, fill=t2color] (1.4*\z, -1.2) rectangle (2.1*\z, -0.6);
+                \node[font=\sffamily\fontsize{7}{8}\selectfont\bfseries, align=center] at (1.75*\z, -0.9) {\texttt{task2()}\\[-2pt]\tiny P=2s (ID=1)};
+                \node[font=\sffamily\fontsize{5}{6}\selectfont, color=black!70] at (1.75*\z, -1.35) {\texttt{ready[1]=FALSE}};
+
+                % 7. Dispatcher pasa a Task 3
+                \draw[box, fill=dispcolor] (2.1*\z, 0.6) rectangle (2.3*\z, 1.2);
+                \node[font=\sffamily\fontsize{5}{6}\selectfont, align=center] at (2.2*\z, 0.9) {\texttt{ready?}\\[-2pt]ID=2};
+
+                % 8. Ejecución secuencial de Task 3
+                \draw[->, line width=0.7pt, dashed] (2.3*\z, 0.9) -- (2.3*\z, -1.7);
+                \draw[box, fill=t3color] (2.3*\z, -2.0) rectangle (3.2*\z, -1.4);
+                \node[font=\sffamily\fontsize{7}{8}\selectfont\bfseries, align=center] at (2.75*\z, -1.7) {\texttt{task3()}\\[-2pt]\tiny P=3s (ID=2)};
+                \node[font=\sffamily\fontsize{5}{6}\selectfont, color=black!70] at (2.75*\z, -2.15) {\texttt{ready[2]=FALSE}};
+
+                % 9. Finalización y reingreso a Sleep
+                \draw[box, fill=dispcolor] (3.2*\z, 0.6) rectangle (3.5*\z, 1.2);
+                \node[font=\sffamily\fontsize{5}{6}\selectfont, align=center] at (3.35*\z, 0.9) {Fin loop\\[-2pt]\texttt{ready=0}};
+
+                \draw[box, fill=sleepcolor] (3.5*\z, -2.5) rectangle (4.2*\z, 2.1);
+                \node[font=\sffamily\fontsize{7}{8}\selectfont, color=black!70, align=center] at (3.85*\z, -0.2) 
+                    {\texttt{sleep()}};
+
+                % --- Etiquetas de componentes en el margen izquierdo del Zoom ---
+                \node[anchor=east, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=schedcolor!80!black] at (-0.35, 1.6) {ISR / Scheduler};
+                \node[anchor=east, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=dispcolor!80!black] at (-0.35, 0.9) {Dispatcher Loop};
+                \node[anchor=east, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=t1color!80!black] at (-0.35, -0.1) {Ejecución T1};
+                \node[anchor=east, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=t2color!80!black] at (-0.35, -0.9) {Ejecución T2};
+                \node[anchor=east, font=\sffamily\fontsize{6}{7}\selectfont\bfseries, color=t3color!80!black] at (-0.35, -1.7) {Ejecución T3};
+
+            \end{tikzpicture}
+        
+        \end{center}
+
+        El modelo de planificador cooperativo se puede hacer más completo indicando, por ejemplo, prioridades, tiempos de activación de tareas, y multitud de parámetros adicionales para hacerlo más complejo. Cada uno tendrá sus ventajas e inconvenientes. Lo más importante es conocer que, en cualquier caso, la distribución óptima de tareas es un problema NP-complejo. Por muy inteligente que hagamos nuestro planificador, en sistemas con una gran contingencia entre tareas, lo más que podremos hacer es aproximarnos a una ejecución ideal de las tareas. Es por ello muy importante contar con las herramientas de perfilado adecuadas como para asegurar que el sistema cumple con los requisitos establecidos.
+
+        \subsubsection{Bloqueos}
+
+            Otro aspecto importante en este tipo de sistemas es la capacidad de recuperarse ante bloqueos. Si una tarea se queda atascada, el dispatcher no puede por sí mismo pararla. Para ello, se pueden introducir \emph{watchdogs}. Un \emph{watchdog} es un temporizador que, en caso de llegar a su límite, resetea el sistema a un cierto estado. Se puede, por ejemplo, en cada iteración del dispatcher, resetear el temporizador. Así, si se deja de resetear (por un bloqueo de alguna tarea) el temporizador llegará a su límite y reiniciará el sistema. La gestión se puede hacer de la siguiente manera:
+
+            \begin{lstlisting}
+
+                void wd_isr() {
+                    SYSTEM_RESET();
+                }
+
+                static uint16 timeout; 
+                
+                void wd_on (uint16 dms) { 
+                    timeout = dms; 
+                    WTCNT = dms; 
+                    //configuramos el watchdog para generar interrupciones al llegar a
+                    //0 (cuenta descendente). Si llega, reiniciará el sistema
+                } 
+                
+                void wd_kick (void) { 
+                    //reinicia la cuenta regresiva
+                    WTCNT = timeout; 
+                }
+
+                void dispacher( void ) { 
+                    //funcionalidad de dispatcher habitual
+                    //si se queda atascado, no llega nunca aquí,
+                    //y por tanto no reinicia el watchdog
+                    wd_kick(); 
+                    //también es posible crear una tarea wd_kick() 
+                    //que vaya en la propia lista del dispatcher a máxima prioridad
+                    //en caso de sistemas más complejos
+                }
+            \end{lstlisting}
+
+            Al reiniciarse el sistema, se pueden consultar registros internos del procesador, o valores en memoria, para saber las causas (por ejemplo, si así lo preparamos y programamos, conocer la tarea causante del bloqueo).
+
+
+
+
+
+
+
+\end{document}

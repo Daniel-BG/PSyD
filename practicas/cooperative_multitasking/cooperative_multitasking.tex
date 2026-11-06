@@ -302,16 +302,14 @@
                 }
 
                 void delete_task (uint32_t id ) {
-                    tasks[id].task_function = 0;
-                    tasks[id].period_ms = 0;
-                    tasks[id].last_run = 0;
-                    tasks[id].ready = 0;
+                    // ... completar inicializar la estructura a 0 
+                    // ... para luego poder identificar si hay o no tareas
+                    // ... o si están o no listas
                 }
 
                 void scheduler_init (void) {
-                    uint32_t id;
-                    for( id=0; id<MAX_TASKS; id++ )
-                        delete_task( id );
+                    // ... ejecuta delete_task para todas las tareas, a fin 
+                    // ... de reiniciarlas
                 }
             \end{lstlisting}
 
@@ -319,12 +317,12 @@
 
             \begin{lstlisting}
                 void scheduler (void) {
-                    uint32_t tick_actual = GetTick();
-                    for (uint32_t id = 0; id < MAX_TASKS; id++)
-                        if (tasks[id].task_function) //if there is a task here
-                           {
-                            // ... completar: si le toca ejecutar, marcar como ready
-                           }
+                    // ... completar mirar el momento de tiempo actual (GetTick())
+                    // ... recorrer la lista de tareas, 
+                    // ... si la trea existe, ver si le toca ya (en función
+                    // ... del tiempo) ejecutarse, y en ese caso marcar como
+                    // ... ready y ajustar valores para que no se dispare de nuevo
+                    // ... hasta que le vuelva a tocar
                 }
             \end{lstlisting}
 
@@ -332,15 +330,9 @@
 
             \begin{lstlisting}
                 void dispacher (void) {
-                    uint32_t id;
-                    for (id = 0; id < MAX_TASKS; id++)
-                        if (tasks[id].ready) {
-                            // así se ejecuta un puntero a función
-                            // por si alguna vez te lo habías preguntado
-                            // (probablemente no, pero a que mola?)
-                            (*tasks[id].task_function)();
-                            tasks[id].ready = 0;
-                        }
+                    // ... completar recorrer la lista de tareas
+                    // ... completar si la tarea está lista, ejecutar su función 
+                    // y marcar como no lista
                 }
             \end{lstlisting}
 
