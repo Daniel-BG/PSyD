@@ -98,14 +98,14 @@
         \begin{itemize}
             \item \textbf{\lstinline|__DMB()| (Data Memory Barrier):} Garantiza que todas las accesos a memoria (lecturas y escrituras) previos a la barrera se hayan completado antes de que se inicie cualquier acceso a memoria posterior. No frena la ejecución de instrucciones que no accedan a memoria.
                 \begin{lstlisting}
-                    __attribute__((always_inline)) static inline void __DSB(void) {
+                    __attribute__((always_inline)) static inline void __DMB(void) {
                         __asm volatile ("dmb 0xF":::"memory");
                     }
                 \end{lstlisting}    
 
             \item \textbf{\lstinline|__DSB()| (Data Synchronization Barrier):} Detiene la ejecución de \textbf{todas} las instrucciones hasta que las operaciones de acceso a memoria pendientes hayan finalizado.
                 \begin{lstlisting}
-                    __attribute__((always_inline)) static inline void __DMB(void) {
+                    __attribute__((always_inline)) static inline void __DSB(void) {
                         __asm volatile ("dsb 0xF":::"memory");
                     }
                 \end{lstlisting}

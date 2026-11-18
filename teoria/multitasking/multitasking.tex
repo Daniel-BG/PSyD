@@ -111,106 +111,6 @@
             \end{lstlisting}
 
 
-    \subsection{Arquitecturas RTOS}\label{sub:rtostask}
-
-        En las diferentes arquitecturas de multitarea cooperativa, se presenta un problema común: cuando una tarea está en ejecución y se bloquea, siempre bloqueará al resto. Esto presenta un gran problema pues el sistema completo se cae debido a un único punto de fallo. Para solventarlo, se debe dejar de confiar en el aspecto \emph{cooperativo}, y moverse hacia una arquitectura \emph{expropiativa} capaz de retirar de ejecución las tareas. Esto se hace mediante la presencia de un Sistema Operativo en Tiempo Real o \textbf{RTOS}.
-
-        En él, varias tareas RTI atienden a los dispositivos de E/S en \emph{foreground}, mientras que otras tareas en \emph{background} realizan el resto de funciones, ya sean independientes o disparadas en algún momento por las RTI. No hay necesariamente tarea principal o \emph{main}, que desaparece tras configurarse todo el sistema. Para comunicarse entre sí, las tareas utilizan variables compartidas, lo cual implica la necesidad de poder detectar y resolver el acceso a secciones críticas.
-
-        Existe un código de \textbf{kernel} que se encarga de orquestrar todas estas intercomunicaciones. Ofrece mecanismos para sincronizar y comunicar tareas, decide según prioridades la tarea en ejecución, y lo más importante, \textbf{conmuta} la ejecución de tareas dinámicamente. La única desventaja presente en este sistema es la sobrecarga de tener al propio kernel en ejecución, pero sus ventajas lo compensan ampliamente.
-
-        Aunque un RTOS puede ser cooperativo (donde una tarea cede voluntariamente el control al kernel, terminando o mediante señales específicas), lo más habitual es contar con un RTOS expropiativo, donde las excepciones (RTI o propias del kernel) disparan la conmutación de tareas. En este caso, ante los eventos:
-
-        \begin{itemize}
-            \item La tarea en ejecución se interrumpe y el kernel guarda su contexto.
-            \item La RTI se ejecuta y potencialmente pide al kernel la ejecución de cierta tarea.
-            \item El kernel marca como preparada la ejecución de la tarea que esperaba el dato.
-            \item El planificador conmuta a la tarea más prioritaria en cada momento, que podría ser (o no) la nueva tarea encolada.
-        \end{itemize}
-
-        \begin{lstlisting}
-            void main() {
-                // crea tareas
-                // initializa RTOS
-            }
-
-            void isr_a_handler() {
-                //trata isr de periférico a
-                signal(A);
-            }
-
-            void isr_b_handler() {
-                //trata isr de periférico b
-                signal(B);
-            }
-
-            void task_a() {
-                while (1) {
-                    wait(A);
-                    fun_a();
-                }
-            }
-
-            void task_b() {
-                while (1) {
-                    wait(B);
-                    fun_b();
-                }
-            }
-        \end{lstlisting}
-
-        Para la sincronización entre las diferentes tareas (en \emph{foreground} o \emph{background}) se cuenta con mecanismos ofrecidos por el kernel como semáforos, mutex, variables compartidas... propios de un sistema operativo.
-
-        Cuando los datos se comparten entre diversas tareas, existe el problema de la desincronización cuando, por ejemplo, una tarea es interrumpida mientras está consultando los datos proporcionados por otra:
-
-        \begin{lstlisting}
-            volatile uint16_t temp[2]; 
-            void leerTemperatura_isr(void) { 
-                // borraflag de int. pendiente
-                temp[0] = // ...leer del HW... 
-                temp[1] = // ...leer del HW... 
-            } 
-            
-            void main(void) { 
-                uint16_t0, t1; 
-                while(1) { 
-                    // <--- INT: La RTI lee dos valores iguales (7 y 7 por ejemplo)
-                    t0 = temp[0]; 
-                    // <--- INT: La RTI lee dos valores iguales (8 y 8 por ejemplo)
-                    t1 = temp[1]; 
-                    // Sin embargo, la alarma suena al haberse guardado en momentos diferentes
-                    if( t0 != t1 ) 
-                        //suena alarma
-                } 
-            }
-        \end{lstlisting}
-
-        La solución pasa por hacer accesos atómicos a los datos compartidos, deshabilitando las interrupciones al acceder a los datos:
-
-         \begin{lstlisting}
-            while(1) { 
-                INT_DISABLE();
-                t0 = temp[0]; 
-                t1 = temp[1]; 
-                INT_ENABLE();
-                if( t0 != t1 ) 
-                    //suena alarma
-            } 
-        \end{lstlisting}
-
-        Aún así, este mecanismo no es trivial. Hay que asegurarse que toda inactivación es seguida por una activación, y que no se anidan parejas de inactivación/activación, ya que podrían activarse accidentalmente antes de tiempo.
-
-        Las interrupciones son, con todo, la forma idónea de dar respuesta rápida a eventos. Su latencia depende de:
-
-        \begin{enumerate}
-            \item El tiempo máximo en que están deshabilitadas
-            \item El tiempo que tarda en ejecutarse cualquier RTI de mayor prioridad (en caso de interrupciones anidables).
-            \item El tiempo que tarda el procesador en detectar la interrupción y saltar a la RTI.
-            \item El tiempo que se tarda en guardar el contexto y realizar la acción de respuesta.
-        \end{enumerate}
-
-        El código por tanto deberá ser pequeño y eficiente para reducir los tiempos de ejecución y cambio de contexto, las secciones críticas cortas para reducir el tiempo de deshabilitación, y la arquitectura eficiente para detectar y saltar rápido.
-
 
     \subsection{Correción en aplicaciones multihebra}
         
@@ -641,7 +541,7 @@
 
         Cuando se dispone de múltiples tareas, una primera aproximación puede incluir el preprogramar su orden de ejecución mediante una lista que se ejecuta periódicamente. Sin embargo, estos sistemas (llamados \emph{cyclic-executive}) son muy poco flexibles, especialmente cuando se interactúa con personas o entornos que pueden generar interrupciones en momentos arbitrarios. 
 
-        Como solución, se introduce el concepto de planificadores. En las \Cref{sub:cooptask,sub:rtostask} hemos visto diferentes ideas de cómo varias tareas pueden ejecutarse, pero no hemos explicado el concepto de prioridades entre ellas, y cómo un planificador puede (y debe) evaluar entre las tareas disponibles, cuál se debería ejecutar (basándose en prioridades, deadlines de ejecución, etc).
+        Como solución, se introduce el concepto de planificadores. En \Cref{sub:cooptask} hemos visto diferentes ideas de cómo varias tareas pueden ejecutarse, pero no hemos explicado el concepto de prioridades entre ellas, y cómo un planificador puede (y debe) evaluar entre las tareas disponibles, cuál se debería ejecutar (basándose en prioridades, deadlines de ejecución, etc).
 
 
         En todo momento existe una úncia tarea en ejecución, y se ejecutan hasta completarse, sin ser interrumpidas por otras. Las tareas se preparan con periodicidad fija (p.ej disparándose con un timer), se encolan en una lista de tareas preparadas y, cuando la CPU está libre, elige entre las mismas siguiendo algún criterio (puede ser simplemente el orden de cola, o algo más complejo basándose en prioridades).

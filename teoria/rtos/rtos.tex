@@ -1,0 +1,638 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\section{Sistemas de tiempo real / RTOS}
+
+    En las diferentes arquitecturas de multitarea cooperativa, se presenta un problema común: cuando una tarea está en ejecución y se bloquea, siempre bloqueará al resto. Esto presenta un gran problema pues el sistema completo se cae debido a un único punto de fallo. Para solventarlo, se debe dejar de confiar en el aspecto \emph{cooperativo}, y moverse hacia una arquitectura \emph{expropiativa} capaz de retirar de ejecución las tareas. Esto se hace mediante la presencia de un Sistema Operativo en Tiempo Real o \textbf{RTOS}.
+
+    En él, varias tareas RTI atienden a los dispositivos de E/S en \emph{foreground}, mientras que otras tareas en \emph{background} realizan el resto de funciones, ya sean independientes o disparadas en algún momento por las RTI. No hay necesariamente tarea principal o \emph{main}, que desaparece tras configurarse todo el sistema. Para comunicarse entre sí, las tareas utilizan variables compartidas, lo cual implica la necesidad de poder detectar y resolver el acceso a secciones críticas.
+
+    Existe un código de \textbf{kernel} que se encarga de orquestrar todas estas intercomunicaciones. Ofrece mecanismos para sincronizar y comunicar tareas, decide según prioridades la tarea en ejecución, y lo más importante, \textbf{conmuta} la ejecución de tareas dinámicamente. La única desventaja presente en este sistema es la sobrecarga de tener al propio kernel en ejecución, pero sus ventajas lo compensan ampliamente.
+
+    Aunque un RTOS puede ser cooperativo (donde una tarea cede voluntariamente el control al kernel, terminando o mediante señales específicas), lo más habitual es contar con un RTOS expropiativo, donde las excepciones (RTI o propias del kernel) disparan la conmutación de tareas. 
+
+    \subsection{Características de un Sistema de tiempo real}
+
+        Un sistema de tiempo real debe reaccionar ante cambios en su entorno en un plazo máximo o \emph{deadline}. Su corrección depende no sólo del resultado de la tarea, sino del momento en que termine. Según las consecuencias de la violación de los plazos, las tareas se clasifican en:
+
+        \begin{itemize}
+            \item \textbf{Hard:} La no ejecución provoca consecuencias catastróficas. (Ej: marcapasos)
+            \item \textbf{Firm:} El resultado es inútil si se obtiene tarde, pero no causa daños. (Ej: frame de vídeo en directo).
+            \item \textbf{Soft:} El resultado es útil, pero el rendimiento se degrada. (Ej: GPS para seguimiento)
+        \end{itemize}
+
+        Otra clasificación de las tareas, según periodicidad, es la siguiente:
+        \begin{itemize}
+            \item \textbf{Periódicas:} Se ejecutan frecuentemente a intervalos de tiempo fijos y regulares.
+            \item \textbf{Aperiódicas:} Se ejecutan con frecuencia, pero a intervalos de tiempo variables que no pueden ser predichos de antemano (por ejemplo, eventos derivados de la interactividad con el usuario).
+            \item \textbf{Esporádicas:} Se ejecutan raramente (o quizás nunca durante la operación normal), pero pueden tener una gran importancia cuando ocurren (por ejemplo, errores de hardware, alertas o fallos en suministro eléctrico, etc).
+        \end{itemize}
+
+        El orden en que se ejecutan las tareas lo determina una \textbf{planificación} (\textit{scheduling}). Un conjunto de tareas se considera \textbf{planificable} si es posible satisfacer los requisitos temporales de todas ellas. Los planificadores en tiempo real se clasifican en tres categorías:
+
+        \begin{enumerate}
+            \item \textbf{Estáticos:} Siguen una planificación fija precalculada antes de la ejecución (por ejemplo, \textit{Cyclic Executive}).
+            \item \textbf{Basados en prioridades estáticas:} El planificador únicamente tiene en cuenta las prioridades fijas asignadas a las tareas en diseño (por ejemplo, \textit{Rate-Monotonic Scheduling} --- RMS).
+            \item \textbf{Basados en prioridades dinámicas:} Las prioridades van cambiando en tiempo de ejecución en función de las características de las tareas y de la evolución de su ejecución (por ejemplo, \textit{Earliest Deadline First} (EDF), \textit{Least Completion Time} (LCT), o \textit{Least Slack Time} (LST)).
+        \end{enumerate}
+
+        \subsubsection{Predictabilidad}
+
+        Para garantizar el cumplimiento de los \textit{deadlines}, es indispensable que el tiempo de ejecución de las tareas sea conocido al desarrollar la aplicación. Por ello, los sistemas de tiempo real intentan eliminar todas aquellas causas hardware y software que puedan introducir retardos impredecibles o incertidumbre. Por norma general, se \textbf{evita}:
+
+        \begin{itemize}
+            \item El uso de DMA por robo de ciclo, ya que la compartición del bus es causa de incertidumbre.
+            \item El uso de caché, ya que la temporización de los aciertos/fallos genera incertidumbre.
+            \item Interrupciones para dispositivos aperiódicos, que pueden introducir variabilidad en la ejecución. Preferible hacer polling periódico.
+            \item Uso de MMU. Los sistemas de gestión de memoria complejos introducen incertidumbre si hay fallos de página.
+            \item Uso de estructuras de datos dinámicas (vectores, pilas, listas...) ya que su tiempo de acceso es variable según el tamaño.
+            \item Uso de procesadores segmentados o superescalares, en casos extremos donde incluso ciclos extra por dependencias pueden marcar la diferencia.
+        \end{itemize}
+
+
+    \subsection{Arquitectura general de un RTOS}
+
+        Aunque cada RTOS tiene sus peculiaridades, y hay bastantes\footnote{FreeRTOS (\url{https://www.freertos.org/}), MicroC (\url{https://github.com/weston-embedded/uC-OS3}), ThreadX (\url{https://github.com/eclipse-threadx}), Zephyr (\url{https://www.zephyrproject.org/})}, tienen estructuras y comportamientos comunes. 
+
+        Suelen ser elementos software muy ligeros (para evitar sobrecargar el sistema), construido con un planificador expropiativo sencillo, y sin drivers, sistemas de ficheros, o protocolos de red, que se añaden como módulos adicionales si se desea. Ofrece todos sus servicios (sincronización, interrupciones, temporización...) como API para que los programadores puedan acceder de manera sencilla desde las tareas que diseñen para su ejecución. En esencia, un RTOS se preocupa de:
+
+        \begin{itemize}
+            \item \textbf{Iniciar} los registros arquitectónicos del sistema. Su adaptación a arquitecturas concretas viene dada, habitualmente, según el interés de sus desarrolladores y usuarios.
+            \item \textbf{Planificar} las tareas para cumplir ciertos requisitos temporales. En este sentido puede ser un RTOS con cumplimiento \emph{duro} de tareas (garantiza su ejecución en un momento dado), \emph{firme} (donde se admite un cierto grado de incumplimiento, si bien el resultado ya no vale para las tareas retrasadas), o \emph{suave} (la utilidad de tareas retrasadas se degrada con el tiempo, pero se permiten retrasos).
+            \item Ejecutar \textbf{cambios de contexto} para permitir ejecución multi tarea. Bien mediante eventos, o mediante técnicas de compartimiento de tiempo.
+            \item \textbf{Compartir recursos} entre tareas proporcionando primitivas de sincronización como semáforos, mutexes, etc.
+            \item Gestionar las \textbf{interrupciones} que permitan ofrecer la funcionalidad multitarea, así como otras.
+            \item Gestionar la \textbf{memoria} disponible para las diferentes tareas, tanto en la pila de llamadas como en bloques asignados dinámicamente.
+            \item \textbf{Abstraer} la ejecución a través de librerías específicas para el hardware soportado. Incluso, abstraer drivers para facilitar la implementación de software de alto nivel.
+        \end{itemize}
+
+        \subsubsection{Inicio del sistema}
+            
+            Antes de lanzar cualquier tarea de usuario, el RTOS debe preparar el entorno de ejecución de bajo nivel (proceso conocido como \emph{bootstrapping} o secuencia de arranque). Esto implica:
+            \begin{itemize}
+                \item Configurar el mapa de memoria, reservando espacio (generalmente de manera estática) para estructuras del sistema.
+                \item Inicializar los punteros de pila iniciales (\emph{Main Stack Pointer} en arquitecturas ARM Cortex-M, por ejemplo).
+                \item Establecer los relojes del sistema para establecer la temporización con que se trabaja.
+                \item Configurar los registros de control de estado del procesador.
+                \item Inicializa la tabla de vectores de interrupción
+                \item Preparar las estructuras de datos internas del kernel (colas de tareas listas, bloqueadas, etc.)
+            \end{itemize}
+                
+            La portabilidad hacia distintas arquitecturas (ARM, RISC-V, Xtensa, AVR) se logra aislando este código dependiente del silicio en una capa específica llamada \emph{Port Layer}, cuya existencia depende del soporte de la comunidad o del fabricante. 
+
+        \subsubsection{Planificación de tareas} 
+            El núcleo del RTOS es su planificador o (\emph{scheduler}), encargado de decidir qué tarea debe ejecutarse en cada instante. Para ello, se utilizan diferentes algoritmos:
+
+            \begin{itemize}
+                \item \emph{Earliest deadline First}: Las tareas se ejecutan según cuándo deban estar terminadas. Así se asegura que siempre se atiende a la tarea que requiere de mayor atención. A cambio, el algoritmo requiere una mayor sobrecarga (para ordenar tareas dinámicamente) y disponer de estimaciones de tiempo de ejecución.
+                \item \emph{Expropiativo con prioridad}: Las tareas más prioritarias pueden expropiar a las menos prioritarias, pero en ningún caso una tarea prioritaria sale de ejecución a cambio de una de prioridad menor.
+                \item \emph{Round-Robin time slicing}: Las tareas se van ejecutando alternativamente durante periodos de tiempo predeterminados, siempre y cuando estén listas. Esto hace que todas las tareas avancen a la vez. Esta técnica puede combinarse con prioridades para que, dentro de las tareas de mayor prioridad, todas avancen a la vez. 
+            \end{itemize}
+
+            Existen muchos más, así como combinaciones de diferentes algoritmos de planificación. Normalmente se busca un equilibrio entre la complejidad de planificar y la calidad de la planificación obtenida, así como garantías matemáticas (en caso de ser necesario) de que se cumplen ciertos requisitos temporales. Para poder realizarse la planificación, se tienen que inspeccionar periódicamente las tareas disponibles mediante interrupciones.
+
+        \subsubsection{Gestión de interrupciones (ISR)} 
+            Las interrupciones hardware son imprescindibles para responder de forma inmediata a eventos externos (llegada de un dato por UART, pulsación de un botón, fin de una conversión ADC,...). El RTOS gestiona el anidamiento de interrupciones mediante prioridades, y establece las interfaces entre las Rutinas de Servicio de Interrupción (ISR) y las tareas. 
+            
+            Una interrupción especial es la proveniente periódicamente del \emph{SysTick}, que actúa como el latido del sistema operativo para contabilizar retardos (\emph{delays}), gestionar tiempos de espera (\emph{timeouts}) y ejecutar las labores de planificación o expropiación mediante \emph{time-slicing}. Siempre que un planificador, disparado mediante SysTick, determine que toca cambiar de tarea, disparará la interrupción de cambio de contexto, que en general es la de menor prioridad (para atender antes a todos los periféricos).
+
+        \subsubsection{Cambios de contexto}
+            Independientemente del tipo de planificador elegido, existe un momento donde una tarea en ejecución tiene que ser cambiada por otra. Ya sea por la necesidad de ejecutar una tarea más prioritaria, o para simular el paralelismo en un único nucleo. Esto se conoce como el cambio de contexto, pues el procesador pasa a ejecutar un código diferente.
+            
+            Un cambio de contexto consiste en suspender la ejecución de la tarea actual, guardar todo su estado de ejecución (registros de propósito general, contador de programa o PC, puntero de pila o SP y registros de estado) en su propio bloque de control de tarea (\emph{Task Control Block} - TCB) o en su pila, y cargar el estado previamente guardado de la siguiente tarea seleccionada por el planificador. 
+
+            Los cambios de contexto no solo se pueden dar de manera forzosa. También ocurren cuando una tarea termina, o cuando tiene que quedar a la espera de un evento o dato compartido, en cuyo caso cederá voluntariamente el control. Los cambios de contexto se realizan muy cercanos al hardware, y forman en general parte de la \emph{Port Layer} dependiente de la arquitectura subyacente. Aquí se muestra un ejemplo en un Cortex-M4:
+
+            \begin{lstlisting}
+                /**
+                * PendSV Handler: Performs the actual context switch in assembly.
+                * Saves software registers of the current task, switches to the PSP of the
+                * next task, and restores its software registers.
+                */
+                __attribute__((naked)) void PendSV_Handler(void) {
+                    __asm volatile (
+                        // 1. Check if there is an active running task to save
+                        "LDR R0, =current_task_idx \n"
+                        "LDR R1, [R0]              \n"
+                        "CMP R1, #-1               \n"
+                        "BEQ restore_context       \n" // If first run (-1), skip saving current context
+
+                        // 2. Save registers R4 to R11 onto current Process Stack Pointer (PSP)
+                        "MRS R2, PSP               \n" // Get active task's PSP stack pointer
+                        "STMDB R2!, {R4-R11}       \n" // Store R4-R11 onto stack, updating R2
+
+                        // 3. Save the updated Stack Pointer to the current task's TCB
+                        "LDR R3, =tcb_table        \n"
+                        "MOV R4, #16               \n" // Size of TCB structure (16 bytes)
+                        "MLA R3, R1, R4, R3        \n" // Offset = current_task_idx * sizeof(TCB_t)
+                        "STR R2, [R3]              \n" // Save R2 (sp) into tcb_table[current_task_idx].sp
+
+                        "restore_context:          \n"
+                        // 4. Run C logic to find the next task index
+                        "PUSH {LR}                 \n" // Save current LR (EXC_RETURN value)
+                        "BL get_next_task_to_run   \n" // C-function returns next index in R0
+                        "POP {LR}                  \n" // Restore EXC_RETURN value
+
+                        // 5. Load the new task's stack pointer from its TCB
+                        "LDR R1, =tcb_table        \n"
+                        "MOV R2, #16               \n"
+                        "MLA R1, R0, R2, R1        \n" // Offset = next_index * sizeof(TCB)
+                        "LDR R3, [R1]              \n" // Get Stack Pointer (tcb_table[next].sp) into R3
+
+                        // 6. Restore software registers R4-R11 from new task's stack
+                        "LDMIA R3!, {R4-R11}       \n"
+                        "MSR PSP, R3               \n" // Set hardware PSP register to the new stack pointer
+
+                        // 7. Force return using PSP (Process Stack Pointer)
+                        // EXC_RETURN pattern 0xFFFFFFFD forces the thread return to use PSP without floating point
+                        "LDR LR, =0xFFFFFFFD       \n"
+                        "BX LR                     \n" // Return from Exception Mode
+                    );
+                }      
+            \end{lstlisting}
+
+            Podemos ver un diagrama general del flujo de ejecución en un RTOS en la \Cref{fig:rtosflow}.
+
+            % Paleta de colores
+            \definecolor{bootCol}{HTML}{4F46E5}
+            \definecolor{initCol}{HTML}{0D9488}
+            \definecolor{taskCol}{HTML}{16A34A}
+            \definecolor{isrCol}{HTML}{D97706}
+            \definecolor{pendsvCol}{HTML}{DC2626}
+            \definecolor{memCol}{HTML}{475569}
+            \definecolor{textDark}{HTML}{1E293B}
+
+            \begin{figure}
+                \centering
+                \begin{tikzpicture}[
+                    font=\sffamily\footnotesize,
+                    text=textDark,
+                    node/.style={
+                        rectangle,
+                        rounded corners=4pt,
+                        draw=#1,
+                        fill=#1!7!white,
+                        line width=1pt,
+                        inner sep=6pt,
+                        align=left
+                    },
+                    subnode/.style={
+                        rectangle,
+                        rounded corners=3pt,
+                        draw=#1,
+                        fill=white,
+                        line width=0.9pt,
+                        inner sep=5pt,
+                        align=left
+                    },
+                    tag/.style={
+                        rectangle,
+                        rounded corners=2pt,
+                        fill=#1,
+                        text=white,
+                        font=\sffamily\scriptsize\bfseries,
+                        inner xsep=4pt,
+                        inner ysep=1.5pt
+                    },
+                    arrow/.style={
+                        -{Stealth[length=2.3mm, width=1.6mm]},
+                        line width=1pt,
+                        color=textDark
+                    },
+                    irq/.style={
+                        -{Stealth[length=2.3mm, width=1.6mm]},
+                        line width=1pt,
+                        dashed,
+                        color=isrCol
+                    }
+                ]
+
+                % ==============================================================================
+                % FILA 1: ARRANQUE -> INICIALIZACIÓN -> TAREA A
+                % ==============================================================================
+                \node[node=bootCol, minimum width=4.2cm, text width=3.8cm] (boot) at (0, 0) {
+                    \textbf{1. Bootloader} \\ % \tikz[baseline=(b.base)]\node[tag=bootCol](b){MSP};\\[2pt]
+                    $\bullet$ Configura \texttt{VTOR} y \texttt{MSP}\\
+                    $\bullet$ RAM (\texttt{.data} / \texttt{.bss})\\
+                    $\bullet$ Inicia relojes \\
+                    $\bullet$ Llamada a \texttt{main()}
+                };
+
+                \node[node=initCol, minimum width=4.8cm, text width=4.4cm] (init) at (5.1, 0) {
+                    \textbf{2. Init Kernel} \\ %\hfill \tikz[baseline=(b.base)]\node[tag=initCol](b){NVIC};\\[2pt]
+                    $\bullet$ Crea \texttt{TCB} y pilas en RAM\\
+                    $\bullet$ Activa interrupciones \\
+                    $\bullet$ \texttt{PSP} $\rightarrow$ lanza Tarea A
+                };
+
+                \node[node=taskCol, minimum width=4.2cm, text width=3.8cm] (taskA) at (10.2, 0) {
+                    \textbf{3. Tarea A} \\ %\hfill \tikz[baseline=(b.base)]\node[tag=taskCol](b){PSP\_A};\\[2pt]
+                    $\bullet$ Modo \textit{Thread} (usuario)\\
+                    $\bullet$ Ejecuta código con \texttt{PSP\_A}
+                };
+
+                % ==============================================================================
+                % FILA 2: ANATOMÍA DE PILA | ÁRBITRO NVIC <- SYSTICK ISR
+                % ==============================================================================
+
+                \node[node=isrCol, minimum width=4.8cm, text width=4.4cm] (nvic) at (5.1, -2.55) {
+                    \textbf{5. NVIC} \\ %\hfill \tikz[baseline=(b.base)]\node[tag=isrCol](b){Tail-Chaining};\\[2pt]
+                    $\bullet$ Atiende otras ISRs pendientes\\
+                    $\bullet$ Dispara \texttt{PendSV} al quedar libre
+                };
+
+                \node[node=isrCol, minimum width=4.2cm, text width=3.8cm] (systick) at (10.2, -2.55) {
+                    \textbf{4. SysTick ISR}\\ % \hfill \tikz[baseline=(b.base)]\node[tag=isrCol](b){MSP};\\[2pt]
+                    $\bullet$ \textbf{HW} apila temporales \\
+                    $\bullet$ Scheduler elige \textbf{Tarea B}\\
+                    $\bullet$ Activa \texttt{PendSV=1}
+                };
+
+                % ==============================================================================
+                % FILA 3: CAMBIO DE CONTEXTO EN PENDSV (ESQUEMA VISUAL DE PILAS Y TCB)
+                % ==============================================================================
+                \node[subnode=pendsvCol, minimum width=4.1cm, text width=3.7cm] (saveA) at (0.35, -5.65) {
+                    \textbf{6a. Salvar Tarea A}\\[2pt]
+                    $\bullet$ \texttt{PUSH \{R4-R11\}} en \texttt{PSP\_A}\\
+                    $\bullet$ (Resto ya apilados)\\
+                    $\bullet$ Guarda \texttt{PSP\_A} $\rightarrow$ \texttt{TCB\_A}
+                };
+
+                \node[subnode=pendsvCol, minimum width=3.8cm, text width=3.4cm] (swapTCB) at (5.1, -5.65) {
+                    \textbf{6b. Cambio TCB}\\[2pt]
+                    $\bullet$ \texttt{Deshabilita ISR}\\
+                    $\bullet$ \texttt{pxCurrentTCB}: \texttt{A} $\rightarrow$ \texttt{B}\\
+                    $\bullet$ \texttt{Habilita ISR}
+                };
+
+                \node[subnode=pendsvCol, minimum width=4.1cm, text width=3.7cm] (loadB) at (9.85, -5.65) {
+                    \textbf{6c. Cargar Tarea B}\\[2pt]
+                    $\bullet$ Lee \texttt{PSP\_B} $\leftarrow$ \texttt{TCB\_B}\\
+                    $\bullet$ \texttt{POP \{R4-R11\}} de \texttt{PSP\_B}
+                };
+
+                \begin{scope}[on background layer]
+                    \node[rectangle, rounded corners=5pt, draw=pendsvCol, fill=pendsvCol!6!white, line width=1.1pt,
+                        fit=(saveA)(swapTCB)(loadB), inner sep=7pt, inner ysep=13pt] (pendsvBox) {};
+                \end{scope}
+
+                % ==============================================================================
+                % FILA 4: RETORNO Y EJECUCIÓN DE NUEVA TAREA
+                % ==============================================================================
+                \node[node=taskCol, minimum width=4.4cm, text width=4.0cm] (taskB) at (5.1, -8.35) {
+                    \textbf{7. Tarea B} \\% \hfill \tikz[baseline=(b.base)]\node[tag=taskCol](b){Thread | PSP\_B};\\[2pt]
+                    $\bullet$ \textbf{HW} desapila temporales \\
+                    $\bullet$ Se ejecuta \textbf{Tarea B}
+                };
+
+                % ==============================================================================
+                % FLECHAS DE FLUJO
+                % ==============================================================================
+                \draw[arrow] (boot.east) -- (init.west);
+                \draw[arrow] (init.east) -- (taskA.west);
+
+                \draw[irq] (taskA.south) -- node[right, font=\sffamily\scriptsize\bfseries, text=isrCol] {Tick} (systick.north);
+                \draw[arrow] (systick.west) -- (nvic.east);
+                \draw[irq] (nvic.south) -- node[right, font=\sffamily\scriptsize\bfseries, text=pendsvCol] {IRQ} (nvic.south |- pendsvBox.north);
+
+                \draw[arrow] (saveA.east) -- (swapTCB.west);
+                \draw[arrow] (swapTCB.east) -- (loadB.west);
+
+                \draw[arrow] (pendsvBox.south) -- (taskB.north);
+
+                % Bucle al siguiente SysTick
+                \draw[irq] (taskB.east) -- ++(5.75cm, 0) |- node[pos=0.25, right, align=left, font=\sffamily\scriptsize\bfseries, text=isrCol] {Siguiente\\Tick} (systick.east);
+
+                \end{tikzpicture}
+                \caption{Flujo de ejecución en un RTOS}
+                \label{fig:rtosflow}
+            
+            \end{figure}
+
+
+        \subsubsection{Sincronización y compartición de recursos}
+            En un entorno concurrente, múltiples tareas pueden intentar acceder simultáneamente a un mismo recurso compartido (un periférico como un bus SPI, una variable global o un búfer de memoria), lo que provoca condiciones de carrera (\emph{race conditions}) y, potencialmente, corrupción de datos. Para evitarlo, el RTOS provee mecanismos de sincronización y exclusión mutua:
+
+            \begin{itemize}
+                \item \emph{Mutexes} (Mutual Exclusion): Garantizan que solo una tarea acceda al recurso a la vez. El RTOS para la tarea mientras no tenga acceso. También se pueden implementar semáforos o variables condicionales que ofrecen una funcionalidad más compleja.
+                \item Colas de mensajes: Permiten transferir datos de forma segura y estructurada entre tareas sin necesidad de compartir memoria directamente.
+            \end{itemize}
+
+        \subsubsection{Secciones críticas}
+
+            Para sincronizar las diferentes tareas y que accedan a recursos compartidos, el kernel nos ofrece mecanismos de control como semáforos, mutex, variables compartidas, etc. Pero... ¿qué ocurre si es una interrupción quien nos expropia, y no otra tarea?
+
+            \begin{lstlisting}
+                volatile uint16_t temp[2]; 
+                void leerTemperatura_isr(void) { 
+                    // borraflag de int. pendiente
+                    temp[0] = // ...leer del HW... 
+                    temp[1] = // ...leer del HW... 
+                } 
+                
+                void main(void) { 
+                    uint16_t0, t1; 
+                    while(1) { 
+                        // <--- INT: La RTI lee dos valores iguales (7 y 7 por ejemplo)
+                        t0 = temp[0]; 
+                        // <--- INT: La RTI lee dos valores iguales (8 y 8 por ejemplo)
+                        t1 = temp[1]; 
+                        // Sin embargo, la alarma suena al haberse guardado en momentos diferentes
+                        if( t0 != t1 ) 
+                            //suena alarma
+                    } 
+                }
+            \end{lstlisting}
+
+            La solución pasa por hacer accesos atómicos a los datos compartidos, deshabilitando las interrupciones al acceder a los datos. Este es un mecanismo muy utilizado no solo por tareas con secciones críticas, sino por el propio kernel cuando quiere proteger sus secciones críticas:
+
+            \begin{lstlisting}
+                while(1) { 
+                    INT_DISABLE();
+                    t0 = temp[0]; 
+                    t1 = temp[1]; 
+                    INT_ENABLE();
+                    if( t0 != t1 ) 
+                        //suena alarma
+                } 
+            \end{lstlisting}
+
+            Aún así, este mecanismo no es trivial. Hay que asegurarse que toda inactivación es seguida por una activación, y que no se anidan parejas de inactivación/activación, ya que podrían activarse accidentalmente antes de tiempo, o incluso quedarse permanentemente desactivadas.
+
+
+        \subsubsection{Inversión de prioridad}
+
+            En un RTOS, se asume que una tarea de alta prioridad siempre desplazará a cualquier tarea de menor prioridad en cuanto esté lista para ejecutarse. Sin embargo, cuando tenemos recursos compartidos, protegidos con sistemas como \emph{Mutexes} o semáforos puede producirse una anomalía denominada \textbf{inversión de prioridad}.
+
+            Consideremos tres tareas con prioridad ($P_A > P_B > P_C$) y un semáforo $S$ que protege el acceso a un recurso compartido. Se sucenden los siguientes eventos:
+
+            \begin{enumerate}
+                \item La tarea de baja prioridad \textbf{C} está en ejecución y cierra el semáforo $S$ para entrar en su sección crítica.
+                \item Despierta la tarea de alta prioridad \textbf{A} y expropia a \textbf{C}. \textbf{A} intenta cerrar el mismo semáforo $S$; como está ocupado por \textbf{C}, \textbf{A} pasa a estado \textit{Bloqueado} y \textbf{C} vuelve a entrar en ejecución.
+                \item Mientras \textbf{C} intenta terminar su sección crítica para liberar $S$, despierta la tarea de prioridad media \textbf{B} (que no utiliza el semáforo $S$). Dado que $P_B > P_C$, \textbf{B} expropia a \textbf{C}.
+            \end{enumerate}
+
+            La tarea \textbf{B} (prioridad media) se ejecuta libremente retrasando de forma indirecta a la tarea \textbf{A} (alta prioridad), que permanece bloqueada esperando a que \textbf{C} libere $S$. El potencial retraso de \textbf{A} es ilimitado si siguien llegando tareas de prioridad media, rompiéndose los requisitos de tiempo real. Se puede ver este efecto en la \Cref{fig:inversion}
+
+            % Paleta de colores
+            \definecolor{colA}{HTML}{DC2626}      % Tarea A (Alta prioridad)
+            \definecolor{colB}{HTML}{D97706}      % Tarea B (Media prioridad)
+            \definecolor{colC}{HTML}{0284C7}      % Tarea C (Baja prioridad)
+            \definecolor{colBlock}{HTML}{64748B}  % Estado bloqueado
+            \definecolor{textDark}{HTML}{1E293B}
+            \definecolor{gridLine}{HTML}{CBD5E1}
+
+            % Estilos globales para los cronogramas
+            \tikzset{
+                timeline/.style={-{Stealth[length=2.5mm, width=1.8mm]}, line width=0.9pt, color=textDark},
+                gridtick/.style={dashed, color=gridLine, line width=0.6pt},
+                tasklabel/.style={font=\sffamily\small\bfseries, anchor=east, text=textDark},
+                runA/.style={fill=colA, draw=colA!80!black, line width=0.8pt, rounded corners=1.5pt},
+                runB/.style={fill=colB, draw=colB!80!black, line width=0.8pt, rounded corners=1.5pt},
+                runC/.style={fill=colC, draw=colC!80!black, line width=0.8pt, rounded corners=1.5pt},
+                runCinh/.style={fill=colC!85!white, draw=colA, line width=1.6pt, rounded corners=1.5pt},
+                readyA/.style={fill=colA!12!white, draw=colA, dashed, line width=0.7pt, rounded corners=1.5pt},
+                readyB/.style={fill=colB!12!white, draw=colB, dashed, line width=0.7pt, rounded corners=1.5pt},
+                readyC/.style={fill=colC!12!white, draw=colC, dashed, line width=0.7pt, rounded corners=1.5pt},
+                blocked/.style={fill=colBlock!12!white, draw=colBlock, dotted, line width=0.8pt, rounded corners=1.5pt},
+                evbadge/.style={
+                    rectangle, rounded corners=2pt, fill=white, draw=#1, line width=0.7pt,
+                    font=\sffamily\scriptsize\bfseries, text=textDark, inner xsep=3.5pt, inner ysep=1.5pt
+                },
+                evpin/.style={-{Stealth[length=1.8mm, width=1.3mm]}, line width=0.7pt, color=#1}
+            }
+
+            \begin{figure}[htbp]
+                \centering
+                \begin{tikzpicture}[x=1.06cm, y=1cm]
+                    % Rejilla temporal (t = 0 a 12)
+                    \foreach \t in {0,...,12} {
+                        \draw[gridtick] (\t, -0.15) -- (\t, 3.15);
+                        \node[font=\sffamily\scriptsize, text=colBlock] at (\t, -0.4) {$t_{\t}$};
+                    }
+                    % Eje horizontal
+                    \draw[timeline] (-0.2, -0.15) -- (12.5, -0.15) node[right, font=\sffamily\scriptsize\bfseries] {Tiempo};
+
+                    % Etiquetas de tareas
+                    \node[tasklabel] at (-0.25, 2.65) {\textcolor{colA}{Tarea A} {\scriptsize(Alta)}};
+                    \node[tasklabel] at (-0.25, 1.45) {\textcolor{colB}{Tarea B} {\scriptsize(Media)}};
+                    \node[tasklabel] at (-0.25, 0.25) {\textcolor{colC}{Tarea C} {\scriptsize(Baja)}};
+
+                    % --- BARRAS DE ESTADO ---
+                    % Tarea A: Ejecuta [2,3], Bloqueada en S [3,10], Ejecuta [10,12]
+                    \filldraw[runA]     (2, 2.4) rectangle (3, 2.9);
+                    \filldraw[blocked]  (3, 2.4) rectangle (10, 2.9) node[midway, font=\sffamily\scriptsize\bfseries, text=colBlock] {Bloqueada esperando $S$ (Inversión de prioridad)};
+                    \filldraw[runA]     (10, 2.4) rectangle (12, 2.9) node[midway, font=\sffamily\scriptsize\bfseries, text=white] {Sec. Crítica};
+
+                    % Tarea B: Ejecuta [4,8]
+                    \filldraw[runB]     (4, 1.2) rectangle (8, 1.7) node[midway, font=\sffamily\scriptsize\bfseries, text=white] {Ejecutando (expropia a C)};
+
+                    % Tarea C: Ejecuta [0,1], Sec. Crítica [1,2], Lista [2,3], Sec. Crítica [3,4], Lista [4,8], Sec. Crítica [8,10]
+                    \filldraw[runC]     (0, 0.0) rectangle (1, 0.5);
+                    \filldraw[runC]     (1, 0.0) rectangle (2, 0.5) node[midway, font=\sffamily\tiny\bfseries, text=white] {SC};
+                    \filldraw[readyC]   (2, 0.0) rectangle (3, 0.5);
+                    \filldraw[runC]     (3, 0.0) rectangle (4, 0.5) node[midway, font=\sffamily\tiny\bfseries, text=white] {SC};
+                    \filldraw[readyC]   (4, 0.0) rectangle (8, 0.5) node[midway, font=\sffamily\scriptsize, text=colC] {Lista (expropiada por B)};
+                    \filldraw[runC]     (8, 0.0) rectangle (10, 0.5) node[midway, font=\sffamily\scriptsize\bfseries, text=white] {Sec. Crítica};
+
+                    % --- EVENTOS Y FLECHAS ---
+                    % t=1: C toma S
+                    \node[evbadge=colC] (ev1) at (1, -0.85) {\texttt{Take(S)}};
+                    \draw[evpin=colC] (ev1.north) -- (1, 0.0);
+
+                    % t=2: A despierta
+                    \node[evbadge=colA] (ev2) at (2, 3.45) {A despierta};
+                    \draw[evpin=colA] (ev2.south) -- (2, 2.9);
+
+                    % t=3: A pide S y se bloquea
+                    \node[evbadge=colA] (ev3) at (3, 2.05) {\texttt{Take(S)} $\rightarrow$ Bloq.};
+                    \draw[evpin=colA] (ev3.north) -- (3, 2.4);
+
+                    % t=4: B despierta
+                    \node[evbadge=colB] (ev4) at (4, 0.85) {B despierta};
+                    \draw[evpin=colB] (ev4.north) -- (4, 1.2);
+
+                    % t=8: B termina
+                    \node[evbadge=colB] (ev8) at (8, 0.85) {B termina};
+                    \draw[evpin=colB] (ev8.north) -- (8, 1.2);
+
+                    % t=10: C libera S
+                    \node[evbadge=colC] (ev10) at (10, -0.85) {\texttt{Give(S)}};
+                    \draw[evpin=colC] (ev10.north) -- (10, 0.0);
+
+                    % --- LEYENDA ---
+                    \begin{scope}[shift={(0.2, -1.55)}]
+                        \filldraw[runC] (0, 0) rectangle (0.4, 0.25);
+                        \node[right, font=\sffamily\scriptsize] at (0.45, 0.125) {Ejecutando (\textit{Running})};
+
+                        \filldraw[readyC] (3.4, 0) rectangle (3.8, 0.25);
+                        \node[right, font=\sffamily\scriptsize] at (3.85, 0.125) {Lista (\textit{Ready})};
+
+                        \filldraw[blocked] (6.3, 0) rectangle (6.7, 0.25);
+                        \node[right, font=\sffamily\scriptsize] at (6.75, 0.125) {Bloqueada por semáforo $S$};
+                    \end{scope}
+                \end{tikzpicture}
+                \caption{Cronograma de la \textbf{inversión de prioridad}. Entre $t_4$ y $t_8$, la tarea \textbf{B} retrasa la ejecución de \textbf{A} pese a tener menor prioridad.}
+                \label{fig:inversion}
+            \end{figure}
+
+            Una posible solución a este problema es implementar elementos de sincronización con \textbf{herencia de prioridad}. Cuando una o más tareas quedan bloqueadas esperando un mutex o semáforo, todas ellas adquiren automática la prioridad de la más prioritaria, hasta que ésta libere el recurso.
+
+            Aplicando este mecanismo al escenario anterior, tenemos el siguiente comportamiento que se detalla gráficamente en la \Cref{fig:herencia}.
+            \begin{itemize}
+                \item En $t_3$, al bloquearse \textbf{A} sobre el mutex $S$, el kernel eleva temporalmente la prioridad de \textbf{C} al nivel de \textbf{A} ($P_C \leftarrow P_A$).
+                \item En $t_4$, cuando despierta \textbf{B}, el planificador compara su prioridad con la prioridad de \textbf{C} (ahora mismo heredada de \textbf{A}). Como $P_C = P_A > P_B$, \textbf{B no puede expropiar a C} y permanece en la cola de tareas listas.
+                \item En $t_6$, \textbf{C} termina su sección crítica, libera $S$ y restaura inmediatamente su prioridad base ($P_C$). El mutex se asigna a \textbf{A}, que se ejecuta por ser la más prioritaria.
+            \end{itemize}
+
+            \begin{figure}[htbp]
+                \centering
+                \begin{tikzpicture}[x=1.06cm, y=1cm]
+                    % Rejilla temporal (t = 0 a 12)
+                    \foreach \t in {0,...,12} {
+                        \draw[gridtick] (\t, -0.15) -- (\t, 3.15);
+                        \node[font=\sffamily\scriptsize, text=colBlock] at (\t, -0.4) {$t_{\t}$};
+                    }
+                    \draw[timeline] (-0.2, -0.15) -- (12.5, -0.15) node[right, font=\sffamily\scriptsize\bfseries] {Tiempo};
+
+                    % Etiquetas de tareas
+                    \node[tasklabel] at (-0.25, 2.65) {\textcolor{colA}{Tarea A} {\scriptsize(Alta)}};
+                    \node[tasklabel] at (-0.25, 1.45) {\textcolor{colB}{Tarea B} {\scriptsize(Media)}};
+                    \node[tasklabel] at (-0.25, 0.25) {\textcolor{colC}{Tarea C} {\scriptsize(Baja)}};
+
+                    % --- BARRAS DE ESTADO ---
+                    % Tarea A: Ejecuta [2,3], Bloqueada en S [3,6], Ejecuta [6,8]
+                    \filldraw[runA]     (2, 2.4) rectangle (3, 2.9);
+                    \filldraw[blocked]  (3, 2.4) rectangle (6, 2.9) node[midway, font=\sffamily\scriptsize\bfseries, text=colBlock] {Bloq. ($S$)};
+                    \filldraw[runA]     (6, 2.4) rectangle (8, 2.9) node[midway, font=\sffamily\scriptsize\bfseries, text=white] {Sec. Crítica};
+
+                    % Tarea B: Lista [4,8], Ejecuta [8,11]
+                    \filldraw[readyB]   (4, 1.2) rectangle (8, 1.7) node[midway, font=\sffamily\scriptsize, text=colB] {Lista ($P_B < P_C^{\text{heredada}}$)};
+                    \filldraw[runB]     (8, 1.2) rectangle (11, 1.7) node[midway, font=\sffamily\scriptsize\bfseries, text=white] {Ejecutando};
+
+                    % Tarea C: Ejecuta [0,1], SC [1,2], Lista [2,3], SC con Herencia [3,6], Lista [6,11], Ejecuta [11,12]
+                    \filldraw[runC]     (0, 0.0) rectangle (1, 0.5);
+                    \filldraw[runC]     (1, 0.0) rectangle (2, 0.5) node[midway, font=\sffamily\tiny\bfseries, text=white] {SC};
+                    \filldraw[readyC]   (2, 0.0) rectangle (3, 0.5);
+                    \filldraw[runCinh]  (3, 0.0) rectangle (6, 0.5) node[midway, font=\sffamily\scriptsize\bfseries, text=white] {SC ($P_C \leftarrow P_A$)};
+                    \filldraw[readyC]   (6, 0.0) rectangle (11, 0.5) node[midway, font=\sffamily\scriptsize, text=colC] {Lista (prioridad restaurada)};
+                    \filldraw[runC]     (11, 0.0) rectangle (12, 0.5);
+
+                    % --- EVENTOS Y FLECHAS ---
+                    % t=1: C toma S
+                    \node[evbadge=colC] (ev1) at (1, -0.85) {\texttt{Take(S)}};
+                    \draw[evpin=colC] (ev1.north) -- (1, 0.0);
+
+                    % t=2: A despierta
+                    \node[evbadge=colA] (ev2) at (2, 3.45) {A despierta};
+                    \draw[evpin=colA] (ev2.south) -- (2, 2.9);
+
+                    % t=3: A pide S -> Herencia
+                    \node[evbadge=colA] (ev3) at (3, 2.05) {\texttt{Take(S)} $\rightarrow$ Herencia $P_A$};
+                    \draw[evpin=colA] (ev3.north) -- (3, 2.4);
+
+                    % t=4: B despierta (no expropia)
+                    \node[evbadge=colB] (ev4) at (4.35, 0.85) {B despierta (no expropia)};
+                    \draw[evpin=colB] (ev4.north) -- (4, 1.2);
+
+                    % t=6: C libera S y restaura P_C
+                    \node[evbadge=colC] (ev6) at (6, -0.85) {\texttt{Give(S)} / Restaura $P_C$};
+                    \draw[evpin=colC] (ev6.north) -- (6, 0.0);
+
+                    % --- LEYENDA ---
+                    \begin{scope}[shift={(0.2, -1.55)}]
+                        \filldraw[runCinh] (0, 0) rectangle (0.4, 0.25);
+                        \node[right, font=\sffamily\scriptsize] at (0.45, 0.125) {Ejecutando con \textbf{Prioridad Heredada} ($P_C = P_A$)};
+
+                        \filldraw[readyB] (6.3, 0) rectangle (6.7, 0.25);
+                        \node[right, font=\sffamily\scriptsize] at (6.75, 0.125) {Lista en espera de CPU};
+                    \end{scope}
+                \end{tikzpicture}
+                \caption{Cronograma con \textbf{herencia de prioridad}. La tarea \textbf{C} completa su sección crítica sin ser interrumpida por \textbf{B}, acotando el bloqueo de \textbf{A}.}
+                \label{fig:herencia}
+            \end{figure}
+
+
+        \subsubsection{Gestión de la memoria}
+            Dado que los sistemas embebidos suelen contar con recursos de memoria RAM muy limitados y carecen frecuentemente de Unidad de Gestión de Memoria (MMU) (aunque muchos soportan Unidades de Protección de Memoria (MPU)), el RTOS debe administrar la memoria de forma estricta y predecible:
+
+            \begin{itemize}
+                \item \emph{Gestión de pilas (\emph{Stacks}):} Cada tarea posee su propia pila privada para almacenar variables locales y llamadas a funciones. El RTOS dimensiona estas pilas (generalmente de manera estática) y puede incluir mecanismos de detección de desbordamiento (\emph{Stack Overflow}).
+                \item \emph{Asignación dinámica determinista:} La asignación estándar de C (\texttt{malloc}/\texttt{free}) sufre de fragmentación y tiempos de ejecución indeterminados. Por ello, los RTOS implementan sus propios gestores de memoria (\emph{Heap managers}) o asignadores de bloques de tamaño fijo (\emph{Memory Pools}), garantizando que la reserva y liberación de memoria se realice en tiempo constante $O(1)$.
+            \end{itemize}
+
+        \subsubsection{Abstracción del hardware} 
+            Para evitar que el código de la aplicación quede fuertemente acoplado a los registros de un microcontrolador específico, el RTOS suele integrarse o proporcionar una Capa de Abstracción de Hardware (HAL) y un marco de trabajo para controladores (\emph{device drivers}). Esto permite que los desarrolladores interactúen con periféricos complejos (pilas TCP/IP, sistemas de archivos FAT/LittleFS, buses USB, pantallas) mediante APIs estandarizadas y portables (como POSIX en sistemas más grandes). De este modo, si el hardware cambia de fabricante o familia, basta con sustituir los drivers de bajo nivel manteniendo intacta la lógica de alto nivel.
+
+            En general, portar un RTOS a una arquitectura específica, implica como mínimo lo siguiente:
+
+            \begin{itemize}
+                \item Definir los tipos utilizados por el kernel, para mapear los tipos de variables internas (uint8, uint16, ...) a los tipos concretos del compilador de la arquitectura objetivo.
+                \item Implementar las funciones para habilitar y deshabilitar las interrupciones, para que el kernel pueda proteger sus secciones críticas (entre otros, utiliza estos mecanismos para implementar sincronización entre tareas). Estas funciones se escriben en ensamblador propio de la arquitectura subyacente.
+                \item Implementar la función de creación de TCB. Esto implica reservar el espacio necesario para los registros o inicializar valores de pila, que dependen de nuevo de la arquitectura.
+                \item Implementar las funciones de conmutación de tareas, con las primitivas en ensamblador necesarias como para apilar/desapilar registros.
+                \item Hacer el tratamiento de las interrupciones del temporizador \texttt{SysTick} y \texttt{PendSV}, que activarán los mecanismos internos del kernel para el \emph{scheduler} y \emph{dispatcher} del sistema.
+            \end{itemize}
+
+            Podemos ver un ejemplo de este código ``puente'' para el \MCU en \url{https://github.com/FreeRTOS/FreeRTOS-Kernel/tree/main/portable/GCC/ARM_CM7/r0p1}.
+        
+
+
+
+
+
+
+
+
+   
+\end{document}
+
+
+En este caso, ante los eventos:
+
+    \begin{itemize}
+        \item La tarea en ejecución se interrumpe y el kernel guarda su contexto.
+        \item La RTI se ejecuta y potencialmente pide al kernel la ejecución de cierta tarea.
+        \item El kernel marca como preparada la ejecución de la tarea que esperaba el dato.
+        \item El planificador conmuta a la tarea más prioritaria en cada momento, que podría ser (o no) la nueva tarea encolada.
+    \end{itemize}
+
+    \begin{lstlisting}
+        void main() {
+            // crea tareas
+            // initializa RTOS
+        }
+
+        void isr_a_handler() {
+            //trata isr de periférico a
+            signal(A);
+        }
+
+        void isr_b_handler() {
+            //trata isr de periférico b
+            signal(B);
+        }
+
+        void task_a() {
+            while (1) {
+                wait(A);
+                fun_a();
+            }
+        }
+
+        void task_b() {
+            while (1) {
+                wait(B);
+                fun_b();
+            }
+        }
+    \end{lstlisting}
+
+
+
+
+    En esencia, un Sistema Operativo de Tiempo Real (RTOS) se encarga de gestionar el hardware subyacente para garantizar el determinismo temporal y la concurrencia. Sus responsabilidades fundamentales se desglosan en las siguientes áreas:
+
+\begin{itemize}
+

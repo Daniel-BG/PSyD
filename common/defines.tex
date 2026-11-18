@@ -2,6 +2,7 @@
 \newcommand{\pendiente}[1]{\colorbox{black}{\textcolor{red}{\textbf{#1}}}}
 
 
+
 %%%% HIGHLIGHTS %%%%%
 % Define colors
 \definecolor{lightyellow}{HTML}{FFFFF4} % Ultra-faint, subtle warm yellow background
@@ -15,7 +16,9 @@
     autogobble=true,
     backgroundcolor=\color{lightyellow}, % Very faint background
     basicstyle=\ttfamily\footnotesize,
-    numbers=left,
+    columns=fullflexible,     % Lets characters flow naturally without phantom spaces
+    keepspaces=true,          % Prevents listings from collapsing consecutive spaces
+    %numbers=left,
     numberstyle=\tiny\color{codegray},
     stepnumber=1,
     numbersep=10pt,
