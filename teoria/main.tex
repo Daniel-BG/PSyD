@@ -6,6 +6,14 @@
 % EXTERNAL DEFINITIONS
 \input{../common/defines}
 
+\ifSubfilesClassLoaded{%
+  \titleformat{\section}{\normalfont\Large\bfseries}{}{0pt}{}
+  \renewcommand{\thesection}{}% Use 1, 2, 3...
+  \renewcommand{\thesubsection}{\arabic{subsection}}% Use 1, 2, 3...
+  \renewcommand{\thesubsubsection}{\arabic{subsection}.\arabic{subsubsection}}% Use 1, 2, 3...
+}{
+}
+
 
 \geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
 \setlength{\parskip}{1em}

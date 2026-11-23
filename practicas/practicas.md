@@ -73,19 +73,25 @@ Cuando crece la complejidad de los sistemas, se hace imprescindible disponer de 
 
 ---
 
-## [Práctica 11](thingsboard_data_control/thingsboard_data_control.pdf) - Comunicación remota con ThingsBoard
+## [Práctica 11](rtos/rtos.pdf) - Sistemas operativos en tiempo real
+
+Dentro de las aproximaciones existentes a la planificación de tareas, destaca la de los sistemas operativos en tiempo real. Permiten controlar con exactitud cuándo una tarea puede o no ejecutarse, en especial orientándose al control en tiempo real de dispositivos, sensores, etc. Además, proporcionan los mecanismos necesarios para sincronizar tareas y evitar bloqueos. En esta práctica se analiza en concreto el RTOS de FreeRTOS.
+
+---
+
+## [Práctica 12](thingsboard_data_control/thingsboard_data_control.pdf) - Comunicación remota con ThingsBoard
 
 Aunque numerosos sistemas empotrados viven sus días aislados del mundo exterior (internet), muchos otros requieren de comunicación constante. Existen infinidad de plataformas de control, así como protocolos, que nos permiten precisamente esto. Podemos tanto recibir información, como mandar comandos de control desde y hacia nuestros dispositivos. En esta práctica vemos un ejemplo utilizando MQTT y Thingsboard.
 
 ---
 
-## [Práctica 12](thingsboard_ota/thingsboard_ota.pdf) - Actualización remota (OTA) utilizando ThingsBoard
+## [Práctica 13](thingsboard_ota/thingsboard_ota.pdf) - Actualización remota (OTA) utilizando ThingsBoard
 
 Hacer aplicaciones perfectas a la primera es algo muy complicado. Aún habiéndolas hecho, normalmente se requieren actualizaciones a lo largo del tiempo. Una vez hemos fabricado un dispositivo y está operativo, el enlace de depuración se suele perder, así que se requieren métodos más sofisticados para reprogramarlo. Uno de los más extendidos es el de dividir la memoria en dos, para crear un buffer de ping-pong donde una aplicación será la activa, y la otra la actualizable. En esta práctica ampliamos la anterior, añadiendo la capacidad de descargar aplicaciones via Wifi, grabarlas en la Flash, y por último cederles el control. Aprenderemos además cómo tenemos que compilar nuestras aplicaciones para que se puedan cargar de esta manera dual.
 
 ---
 
-## [Práctica 13](automated_bsp_cubemx/automated_bsp_cubemx.pdf) - Creación automática de BSP
+## [Práctica 14](automated_bsp_cubemx/automated_bsp_cubemx.pdf) - Creación automática de BSP
 
 La creación manual de los BSP tiene la gran ventaja de utilizar única y exclusivamente las funcionalidades que nosotros queramos. Sin embargo, en ocasiones es muy deseable dejar este trabajo a otros, y conseguir un BSP robusto de manera automática, aunque incluya más funciones de la cuenta (con su consecuente coste en uso de memoria). En esta práctica aprendemos a crear automáticamente un BSP con la herramienta STMCubeMX, que nos permitirá seleccionar todos los periféricos que vayamos a utilizar, con su configuración incluida, para preocuparnos sólo de escribir la lógica del programa.
 

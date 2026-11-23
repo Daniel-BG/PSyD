@@ -6,13 +6,25 @@
 % EXTERNAL DEFINITIONS
 \input{../common/defines}
 
-
-\newcounter{numpractica}
-\setcounter{numpractica}{0}%
-\newcommand{\practica}[1]{%
-  \stepcounter{numpractica}%
-  \section{Práctica \thenumpractica: #1}%
+\ifSubfilesClassLoaded{%
+  \titleformat{\section}{\normalfont\Large\bfseries}{}{0pt}{}
+  \renewcommand{\thesection}{}% Use 1, 2, 3...
+  \renewcommand{\thesubsection}{\arabic{subsection}}% Use 1, 2, 3...
+  \renewcommand{\thesubsubsection}{\arabic{subsection}.\arabic{subsubsection}}% Use 1, 2, 3...
+  \newcommand{\practica}[1]{%
+    \section{#1}%
+  }
+}{
+  \newcounter{numpractica}
+  \setcounter{numpractica}{0}%
+  \newcommand{\practica}[1]{%
+    \stepcounter{numpractica}%
+    \section{Práctica \thenumpractica: #1}%
+  }
 }
+
+
+
 
 
 \geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
