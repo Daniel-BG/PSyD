@@ -148,7 +148,7 @@
             > git checkout 202604-LTS 
         \end{lstlisting}
 
-        El repositorio es bastante extenso, pero a nosotros nos interesan unos archivos muy concretos, marcados en rojo en el siguiente diagrama. Echa un vistazo en el interior para mirar, a vista de pájaro, los contenidos de cada uno. Normalmente, la selección de qué ficheros se utilizan se hace desde archivos de configuración globales, pero nosotros lo vamos a hacer a mano por simplicidad.
+        El repositorio es bastante extenso, pero a nosotros nos interesan unos archivos muy concretos, marcados en rojo en el siguiente diagrama. Echa un vistazo en el interior para mirar, a vista de pájaro, los contenidos de cada uno. Normalmente, la selección de qué ficheros se utilizan se hace desde archivos de configuración globales, pero nosotros lo vamos a hacer a mano por simplicidad. Cópialos todos en tu carpeta \texttt{Inc} dentro del proyecto. Si utilizas el workspace de desarrollo, asegúrate de no copiar \texttt{main.c} o habrá conflicto por doble función.
         
         \definecolor{doccomment}{rgb}{0.4, 0.8, 0.4}
         \definecolor{filecolor}{rgb}{0.70,0.00,0.00}
@@ -237,7 +237,7 @@
             .thumb_set SysTick_Handler,xPortSysTickHandler
         \end{lstlisting}
 
-        Ahora solo quedará gestionar el archivo principal \texttt{main.c}, que tendrá esta forma:
+        Asegúrate además que comentas cualquier referencia en tu \texttt{bsp} a los handlers anteriores, ya que de lo contrario, sobreescribirán al de \texttt{port.c}. Ahora solo quedará gestionar el archivo principal \texttt{main.c}, que tendrá esta forma:
 
         \begin{lstlisting}
             #include "FreeRTOS.h"
