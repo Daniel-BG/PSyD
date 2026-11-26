@@ -13,133 +13,9 @@
 
     \subsection{Fundamentos teóricos}
         
-        En general, cualquier plataforma empotrada hoy en día tiene cierta conectividad con la red. Desde electrodomésticos inteligentes hasta estaciones de monitorización atmosférica, pasando por bombillas que pueden cambiarse de color desde el móvil, todos estos dispositivos pueden enviar y recibir información desde internet.
+        En esta práctica vamos a utilizar MQTT como protocolo para comunicarnos con la placa. Entre todas las opciones disponibles, MQTT se posiciona como una alternativa ligera para la comunicación de dispositivos. Todos ellos se conectan a un \emph{broker} o servidor central, enviando y recibiendo información relativa a una suerte de ``variables compartidas''. Según la configuración que hagamos, nuestros dispositivos publicarán, o recibirán actualizaciones, con los valores de dichas variables.
 
-        Para ello existen numerosos protocolos. Uno de los más extendidos, por su ligereza y versatilidad, es \textbf{MQTT}. \textbf{MQTT} es un protocolo ligero para el intercambio de mensajes, diseñado para la comunicación en redes con ancho de banda limitado, y por dispositivos con capacidad de computación reducida. Debido a su simplicidad y escalabilidad, MQTT es de particular interés para aplicaciones de Internet de las cosas (IoT).
-
-        MQTT utiliza un formato de mensaje binario (\Cref{fig:mqtt_packet}), que reduce enormemente la cantidad de información transmitida frente a otros protocolos basados en texto como \textbf{HTTP}.
-
-        \begin{figure}[h]
-            \centering
-            \begin{tikzpicture}[
-                font=\sffamily,
-                box/.style={draw, rectangle, minimum height=1.1cm, align=center, inner sep=6pt, line width=0.8pt},
-                fh/.style={box, fill=blue!15, draw=blue!70!black},
-                vh/.style={box, fill=green!15, draw=green!70!black},
-                pl/.style={box, fill=orange!15, draw=orange!70!black},
-                subbox/.style={box, fill=blue!5, draw=blue!40!black, font=\sffamily\small}
-            ]
-
-                % Level 1: Top-level Structure
-                \node[fh, minimum width=4.5cm] (fixed) {\textbf{Fixed Header}\\(2 to 5 Bytes)};
-                \node[vh, minimum width=3.5cm, right=0cm of fixed] (var) {\textbf{Variable Header}\\(Optional)};
-                \node[pl, minimum width=4.0cm, right=0cm of var] (payload) {\textbf{Payload}\\(Optional)};
-
-                \node[above=0.2cm of fixed.north west, anchor=south west, font=\sffamily\bfseries] {MQTT Control Packet Hierarchy};
-
-                % Level 2: Fixed Header Breakdown
-                \node[subbox, minimum width=6cm, anchor=north west] (byte1) at ($(fixed.south west) + (0,-1.2)$) {\textbf{Byte 1}\\Control Type \& Flags};
-                \node[subbox, minimum width=6cm, right=0cm of byte1] (byte2) {\textbf{Byte 2\dots Byte 5}\\Remaining Length (1--4 Bytes)};
-
-                \draw[thick, ->, >=stealth, blue!70!black] (fixed.south west) -- (byte1.north west);
-                \draw[thick, ->, >=stealth, blue!70!black] (fixed.south east) -- (byte2.north east);
-
-                % Level 3: Byte 1 Bit Breakdown
-                \node[subbox, fill=blue!25, minimum width=3cm, anchor=north west] (type) at ($(byte1.south west) + (0,-1.2)$) {\textbf{Bits 7--4}\\Packet Type (15 types)\\e.g., $0001_2$ = CONNECT};
-                \node[subbox, fill=blue!10, minimum width=3cm, right=0cm of type] (flags) {\textbf{Bits 3--0}\\Flags Specific to Type\\e.g., DUP, QoS, RETAIN};
-
-                \draw[thick, ->, >=stealth, blue!70!black] (byte1.south west) -- (type.north west);
-                \draw[thick, ->, >=stealth, blue!70!black] (byte1.south east) -- (flags.north east);
-
-            \end{tikzpicture}
-            \caption{Formato de los paquetes \textbf{MQTT}}
-            \label{fig:mqtt_packet}
-        \end{figure}
-
-        En \textbf{MQTT} se distinguen los \emph{clientes} y los \emph{brokers}. Un cliente puede enviar mensajes al broker (conteniendo generalmente actualizaciones de valores etiquetados), y el broker reenvía estas actualizaciones a otros clientes que estén suscritos a dichos valores etiquetados. Las etiquetas se indican categorizadas, con cada categoría separada por ``/''. Así, se permiten suscripciones a categorías completas, por ejemplo (luego lo veremos en más detalle al hacer la práctica). Un ejemplo sencillo de esta estructura puede verse en \Cref{fig:mqtt_diagram}
-
-
-        \begin{figure}[h]
-            \centering
-            \begin{tikzpicture}[
-                font=\sffamily,
-                % Define node styles
-                node_base/.style={draw, thick, rectangle, rounded corners, minimum height=1.5cm, align=center, inner sep=10pt},
-                broker/.style={node_base, fill=blue!10, draw=blue!70!black, minimum width=3cm, font=\sffamily\bfseries},
-                client/.style={node_base, fill=white, draw=gray, minimum width=2.5cm},
-                % Define arrow styles
-                arrow_style/.style={-{Stealth[scale=1.0]}, thick},
-                pub_arrow/.style={arrow_style, draw=red!70!black, densely dashed},
-                sub_arrow/.style={arrow_style, draw=green!60!black}
-            ]
-
-                % --- 1. The MQTT Broker (The Core) ---
-                \node[broker] (broker) {
-                    \textbf{MQTT Broker} \\
-                    (e.g., ThingsBoard) 
-                };
-
-                % --- 2. Client that is ONLY a Publisher (Sensor) ---
-                \node[client, left=2.8cm of broker] (sensor) {
-                    Temp. Sensor \\ (Kitchen) \\
-                    \textbf{\textcolor{red!70!black}{Publisher}}
-                };
-
-                % --- 3. Client that is ONLY a Subscriber (Actuator) ---
-                \node[client, right=2.5cm of broker] (lock) {
-                    Front Door Lock \\
-                    \textbf{\textcolor{green!60!black}{Subscriber}}
-                };
-
-                % --- 4. Client that is BOTH (The Hub) ---
-                \node[client, above=2cm of broker] (hub) {
-                    Smart Home Hub (Tablet) \\
-                    \textbf{\textcolor{red!70!black}{Publisher}} \& \textbf{\textcolor{green!60!black}{Subscriber}}
-                };
-
-
-                % --- DRAWING INTERACTIONS AND FLOWS ---
-
-                % Flow Set A: Temperature Data (Sensor -> Broker -> Hub)
-                % Publish connection from sensor to broker
-                \draw[pub_arrow] (sensor.east) -- (broker.west) 
-                    node[midway, above, text=red!70!black, font=\small\bfseries] {PUBLISH}
-                    node[midway, below, font=\footnotesize] {\texttt{home/kitchen/temp}}
-                    node[midway, below=0.4cm, font=\footnotesize, fill=white] {Payload: \texttt{22.5°C}};
-
-                % Subscribe connection from broker to hub
-                \draw[sub_arrow] (broker.north) .. controls +(0,1.2) and +(0,-1.2) .. (hub.south)
-                    node[midway, right=0.3cm, text=green!60!black, font=\small\bfseries, anchor=west] {SUBSCRIBE}
-                    node[midway, right=0.3cm, font=\footnotesize, anchor=west, yshift=-0.4cm] {\texttt{home/kitchen/temp}};
-
-                    
-                % Flow Set B: Lock Command (Hub -> Broker -> Lock)
-                % Publish connection from hub back to broker
-                % Note: Using slightly different anchors to keep lines separated
-                \draw[pub_arrow] ($(hub.south)+(-0.3,0)$) .. controls +(-0.8,-1.2) and +(-0.8,1.2) .. ($(broker.north)+(-0.3,0)$)
-                    node[pos=0.3, left=0.1cm, text=red!70!black, font=\small\bfseries, anchor=east] {PUBLISH}
-                    node[pos=0.3, left=0.1cm, font=\footnotesize, anchor=east, yshift=-0.4cm] {\texttt{home/door/lock}}
-                    node[pos=0.3, left=0.1cm, font=\footnotesize, anchor=east, yshift=-0.7cm] {Payload: \texttt{UNLOCK}};
-
-                % Subscribe connection from broker to lock
-                \draw[sub_arrow] (broker.east) -- (lock.west)
-                    node[midway, above, text=green!60!black, font=\small\bfseries] {SUBSCRIBE}
-                    node[midway, below, font=\footnotesize] {\texttt{home/door/lock}};
-
-
-                % --- LEGEND ---
-                \node[draw, thick, rounded corners, fill=white, inner sep=6pt, anchor=north, yshift=-1cm] (legend) at (broker.south) {
-                    \begin{minipage}{5cm}
-                    \small \textbf{Legend:} \\
-                    \tikz \draw[pub_arrow] (0,0) -- (0.6,0); \textcolor{red!70!black}{ Publish Message (Out)} \\
-                    \tikz \draw[sub_arrow] (0,0) -- (0.6,0); \textcolor{green!60!black}{ Subscribe Message (In)} \\
-                    Note: Red/Green dotted lines represent MQTT control packets (not physical cables).
-                    \end{minipage}
-                };
-            \end{tikzpicture}
-            \caption{Generic MQTT diagram}
-            \label{fig:mqtt_diagram}
-        \end{figure}
+        Sin embargo, la conectividad red mediante WiFi (indispensable para poder utilizar MQTT) no es algo integrado en nuestra placa, así que tendremos que dotarla de ella mediante un módulo externo.
 
         \subsubsection{El módulo Wifi ESP-01S}
 
@@ -149,7 +25,7 @@
         
     \subsection{Desarrollo de la práctica}
 
-        Para realizar la práctica, vamos a hacer uso de un \emph{broker} llamado \textbf{ThingsBoard} (\url{https://thingsboard.io/}). Es una plataforma online que ofrece, de manera gratuita, un \emph{broker} para hasta 5 dispositivos. Como solo tenemos uno, será suficiente. 
+        Para realizar la práctica, vamos a hacer uso de un \emph{broker} MQTT llamado \textbf{ThingsBoard} (\url{https://thingsboard.io/}). Es una plataforma online que ofrece, de manera gratuita, un \emph{broker} para hasta 5 dispositivos. Como solo tenemos uno, será suficiente. 
 
         Para nuestro cliente, utilizaremos las librerías de Eclipse Paho MQTT (\url{https://github.com/eclipse-paho/paho.mqtt.embedded-c}), una implementación ligera de MQTT para dispositivos empotrados.
         

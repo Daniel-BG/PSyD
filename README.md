@@ -12,6 +12,7 @@ Bienvenido al sitio web del material de la asignatura de Programación de Sistem
 * 📄 [7 - Buses externos](teoria/external_peripherals_buses/external_peripherals_buses.pdf)
 * 📄 [8 - Multitarea](teoria/multitasking/multitasking.pdf)
 * 📄 [9 - RTOS](teoria/rtos/rtos.pdf)
+* 📄 [10 - Control remoto](teoria/remote_control/remote_control.pdf)
 
 ## 🛠️ [Prácticas](practicas/main.pdf)
 * 📁 [Punto de entrada a las prácticas](practicas/practicas.md)
