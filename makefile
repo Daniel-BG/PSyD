@@ -11,7 +11,7 @@ ALL_PDFS  := $(MAIN_PDFS) $(SUB_PDFS)
 
 .PHONY: all practicas teoria mains clean distclean
 
-all: $(ALL_PDFS) examenes
+all: $(ALL_PDFS) build-examenes
 
 practicas: $(filter practicas/%,$(ALL_PDFS))
 
@@ -19,8 +19,8 @@ teoria: $(filter teoria/%,$(ALL_PDFS))
 
 mains: $(MAIN_PDFS)
 
-examenes:
-	$(MAKE) -C examenes
+build-examenes:
+	$(MAKE) --no-print-directory -C examenes
 
 # Rebuild the full books whenever any chapter file inside their subdirectories changes
 practicas/main.pdf: $(wildcard practicas/*/*.tex)
@@ -31,6 +31,8 @@ teoria/main.pdf: $(wildcard teoria/*/*.tex)
 
 clean:
 	@for f in $(MAINS) $(SUBS); do latexmk -c -cd "$$f"; done
+	@$(MAKE) --no-print-directory -C examenes clean
 
 distclean:
 	@for f in $(MAINS) $(SUBS); do latexmk -C -cd "$$f"; done
+	@$(MAKE) --no-print-directory -C examenes distclean
